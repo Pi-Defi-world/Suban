@@ -1,0 +1,16 @@
+[package]
+name = "cpmm-pool"
+version.workspace = true
+edition.workspace = true
+description = "Constant-Product Market Maker pool (x*y=k) with real token transfers."
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+soroban-sdk = { workspace = true }
+hub-errors = { path = "../../crates/hub-errors" }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }

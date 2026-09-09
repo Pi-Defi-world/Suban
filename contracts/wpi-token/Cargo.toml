@@ -1,0 +1,15 @@
+[package]
+name = "wpi-token"
+version.workspace = true
+edition.workspace = true
+description = "Wrapped Pi (wPi) Soroban token — admin-minted 1:1 against Pi deposits relayed from Pi Network."
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+soroban-sdk = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }

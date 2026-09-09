@@ -1,0 +1,15 @@
+[package]
+name = "identity"
+version.workspace = true
+edition.workspace = true
+description = "Identity Resolution — maps Pi accounts to on-chain addresses."
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+soroban-sdk = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }

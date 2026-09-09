@@ -1,0 +1,16 @@
+[package]
+name = "liquidity-mining"
+version.workspace = true
+edition.workspace = true
+description = "Liquidity Mining — emissions engine for LP reward distribution."
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+soroban-sdk = { workspace = true }
+hub-errors = { path = "../../crates/hub-errors" }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }

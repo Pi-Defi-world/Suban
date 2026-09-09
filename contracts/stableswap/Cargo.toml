@@ -1,0 +1,16 @@
+[package]
+name = "stableswap"
+version.workspace = true
+edition.workspace = true
+description = "Stableswap Pool — Curve-style invariant for low-slippage stable pairs."
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+soroban-sdk = { workspace = true }
+hub-errors = { path = "../../crates/hub-errors" }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }

@@ -1,0 +1,46 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/hub-types",
+    "crates/hub-errors",
+    "crates/hub-events",
+    "crates/hub-oracle",
+    "crates/hub-token",
+    "contracts/pause-registry",
+    "contracts/fee-router",
+    "contracts/wpi-token",
+    "contracts/usdc-vault",
+    "contracts/escrow",
+    "contracts/lp-token",
+    "contracts/cpmm-pool",
+    "contracts/pool-factory",
+    "contracts/stableswap",
+    "contracts/swap-router",
+    "contracts/liquidity-mining",
+    "contracts/oracle",
+    "contracts/bridge-multisig",
+    "contracts/lending-pool",
+    "contracts/backstop",
+    "contracts/event-registry",
+    "contracts/node-staking",
+    "contracts/identity",
+    "contracts/escrow-factory",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[workspace.dependencies]
+soroban-sdk = "27"
+
+[profile.release]
+opt-level = "z"
+overflow-checks = true
+debug = 0
+strip = "symbols"
+debug-assertions = false
+panic = "abort"
+codegen-units = 1
+lto = true

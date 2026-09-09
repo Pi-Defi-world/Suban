@@ -1,0 +1,17 @@
+[package]
+name = "escrow"
+version.workspace = true
+edition.workspace = true
+description = "Milestone-based escrow contract for ZyraPay and Pi Wave."
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+soroban-sdk = { workspace = true }
+hub-types = { path = "../../crates/hub-types" }
+hub-errors = { path = "../../crates/hub-errors" }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }

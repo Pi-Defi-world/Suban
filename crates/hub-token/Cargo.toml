@@ -1,0 +1,12 @@
+[package]
+name = "hub-token"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+soroban-sdk = { workspace = true }
+hub-errors = { path = "../hub-errors" }

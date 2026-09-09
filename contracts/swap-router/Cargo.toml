@@ -1,0 +1,16 @@
+[package]
+name = "swap-router"
+version.workspace = true
+edition.workspace = true
+description = "Swap Router — multi-hop cross-pool routing."
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+soroban-sdk = { workspace = true }
+hub-errors = { path = "../../crates/hub-errors" }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }

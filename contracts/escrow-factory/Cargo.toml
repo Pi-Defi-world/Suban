@@ -1,0 +1,15 @@
+[package]
+name = "escrow-factory"
+version.workspace = true
+edition.workspace = true
+description = "Escrow Factory — deploys and catalogs escrow instances."
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+soroban-sdk = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }

@@ -1,0 +1,9 @@
+/target
+*.wasm
+.env
+.env.local
+.env.*.local
+node_modules/
+dist/
+*.db
+*.sqlite

@@ -1,0 +1,15 @@
+[package]
+name = "lp-token"
+version.workspace = true
+edition.workspace = true
+description = "SEP-41 LP Token — each pool deploys one instance for its LP shares."
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+soroban-sdk = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
