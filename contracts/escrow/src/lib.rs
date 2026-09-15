@@ -1,6 +1,6 @@
 #![no_std]
 
-//! Escrow Manager — milestone-based escrow for ZyraPay, Pi Wave, and any Zyrachain app.
+//! Escrow Manager — milestone-based escrow for fintech apps, ZyraPay, Pi Wave, and any Zyrachain app.
 //!
 //! Lifecycle: create → fund → submit milestone → approve → release → complete
 //! Disputes: either party can dispute, arbitrator resolves
@@ -175,12 +175,12 @@ impl EscrowManager {
 
         state.config.funder.require_auth();
 
+        state.total_deposited += amount;
+        write_escrow_state(&env, escrow_id, &state);
+
         let asset = soroban_sdk::token::Client::new(&env, &state.config.asset);
         let vault = env.current_contract_address();
         asset.transfer(&state.config.funder, &vault, &amount);
-
-        state.total_deposited += amount;
-        write_escrow_state(&env, escrow_id, &state);
 
         env.events()
             .publish((symbol_short!("esc_fnd"), escrow_id), amount);
@@ -348,17 +348,19 @@ impl EscrowManager {
             return Err(HubError::InsufficientEscrowBalance);
         }
 
-        let asset = soroban_sdk::token::Client::new(&env, &state.config.asset);
-        let vault = env.current_contract_address();
-        asset.transfer(&vault, &state.config.receiver, &release_amount);
-
         state.total_released += release_amount;
 
         if state.milestones_completed == state.config.milestones.len() {
             state.status = EscrowStatus::Completed;
         }
 
+        // CEI: persist state before the external token transfer so a reentrant
+        // call cannot observe stale balances.
         write_escrow_state(&env, escrow_id, &state);
+
+        let asset = soroban_sdk::token::Client::new(&env, &state.config.asset);
+        let vault = env.current_contract_address();
+        asset.transfer(&vault, &state.config.receiver, &release_amount);
 
         env.events().publish(
             (symbol_short!("esc_rel"), escrow_id),
@@ -396,13 +398,13 @@ impl EscrowManager {
             return Err(HubError::DeadlineNotReached);
         }
 
-        let asset = soroban_sdk::token::Client::new(&env, &state.config.asset);
-        let vault = env.current_contract_address();
-        asset.transfer(&vault, &state.config.funder, &remaining);
-
         state.total_released += remaining;
         state.status = EscrowStatus::Refunded;
         write_escrow_state(&env, escrow_id, &state);
+
+        let asset = soroban_sdk::token::Client::new(&env, &state.config.asset);
+        let vault = env.current_contract_address();
+        asset.transfer(&vault, &state.config.funder, &remaining);
 
         env.events().publish(
             (symbol_short!("esc_ref"), escrow_id),
@@ -467,8 +469,6 @@ impl EscrowManager {
             return Err(HubError::InvalidArgument);
         };
 
-        asset.transfer(&vault, recipient, &remaining);
-
         state.total_released += remaining;
         state.status = if outcome == symbol_short!("release") {
             EscrowStatus::Completed
@@ -476,6 +476,8 @@ impl EscrowManager {
             EscrowStatus::Refunded
         };
         write_escrow_state(&env, escrow_id, &state);
+
+        asset.transfer(&vault, recipient, &remaining);
 
         env.events().publish(
             (symbol_short!("esc_res"), escrow_id),

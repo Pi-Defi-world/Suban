@@ -1,4 +1,4 @@
-import type { SubanClient } from './client.js';
+import type { SubanClient, TxResult } from './client.js';
 
 export interface Price {
   price: number;
@@ -56,5 +56,40 @@ export class OracleClient {
   async getConfig(): Promise<OracleConfig> {
     const result = await this.client.simulate(this.contractId, 'config', []);
     return result as OracleConfig;
+  }
+
+  /**
+   * Push a new price for an asset (admin-only, called by the off-chain oracle
+   * service). Maps to `set_price(admin, asset, price, decimals, confidence)`.
+   */
+  async setPrice(
+    asset: string,
+    price: string,
+    decimals: number,
+    confidence: number,
+    adminKeypair: import('@stellar/stellar-sdk').Keypair,
+  ): Promise<TxResult> {
+    return this.client.invoke(
+      this.contractId,
+      'set_price',
+      [adminKeypair.publicKey(), asset, price, decimals, confidence],
+      adminKeypair,
+    );
+  }
+
+  /**
+   * Commit the current price as the last-known price (circuit breaker).
+   * Maps to `commit_price(admin, asset)`.
+   */
+  async commitPrice(
+    asset: string,
+    adminKeypair: import('@stellar/stellar-sdk').Keypair,
+  ): Promise<TxResult> {
+    return this.client.invoke(
+      this.contractId,
+      'commit_price',
+      [adminKeypair.publicKey(), asset],
+      adminKeypair,
+    );
   }
 }

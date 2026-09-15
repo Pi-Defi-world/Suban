@@ -126,10 +126,15 @@ impl LendingPool {
             .get(&USER_DEPOSITS)
             .unwrap_or(Map::new(&env));
         let current = user_deposits.get(from.clone()).unwrap_or(0);
-        user_deposits.set(from, current + amount);
+        user_deposits.set(from.clone(), current + amount);
         env.storage().instance().set(&USER_DEPOSITS, &user_deposits);
 
         env.storage().instance().set(&TOTAL_SUPPLIES, &(total_supply + b_tokens));
+
+        // Custody: pull the deposited underlying from the user into the pool.
+        let asset = soroban_sdk::token::Client::new(&env, &Self::pool_asset(&env));
+        let vault = env.current_contract_address();
+        asset.transfer(&from, &vault, &amount);
 
         Ok(b_tokens)
     }
@@ -168,10 +173,15 @@ impl LendingPool {
             .instance()
             .get(&USER_DEPOSITS)
             .unwrap_or(Map::new(&env));
-        user_deposits_mut.set(from, user_balance - b_token_amount);
+        user_deposits_mut.set(from.clone(), user_balance - b_token_amount);
         env.storage().instance().set(&USER_DEPOSITS, &user_deposits_mut);
 
         env.storage().instance().set(&TOTAL_SUPPLIES, &(total_supply - b_token_amount));
+
+        // Custody: return the underlying to the user.
+        let asset = soroban_sdk::token::Client::new(&env, &Self::pool_asset(&env));
+        let vault = env.current_contract_address();
+        asset.transfer(&vault, &from, &underlying);
 
         Ok(underlying)
     }
@@ -210,6 +220,11 @@ impl LendingPool {
 
         env.storage().instance().set(&TOTAL_BORROWS, &(total_borrows + amount));
 
+        // Custody: send the borrowed underlying to the borrower.
+        let asset = soroban_sdk::token::Client::new(&env, &Self::pool_asset(&env));
+        let vault = env.current_contract_address();
+        asset.transfer(&vault, &from, &amount);
+
         Ok(())
     }
 
@@ -230,11 +245,16 @@ impl LendingPool {
         let repay_amount = amount.min(current_borrow);
 
         let mut user_borrows_mut = user_borrows;
-        user_borrows_mut.set(from, current_borrow - repay_amount);
+        user_borrows_mut.set(from.clone(), current_borrow - repay_amount);
         env.storage().instance().set(&USER_BORROWS, &user_borrows_mut);
 
         let total_borrows: i128 = env.storage().instance().get(&TOTAL_BORROWS).unwrap_or(0);
         env.storage().instance().set(&TOTAL_BORROWS, &(total_borrows - repay_amount));
+
+        // Custody: pull the repaid underlying from the user into the pool.
+        let asset = soroban_sdk::token::Client::new(&env, &Self::pool_asset(&env));
+        let vault = env.current_contract_address();
+        asset.transfer(&from, &vault, &repay_amount);
 
         Ok(repay_amount)
     }
@@ -325,6 +345,12 @@ impl LendingPool {
 
         let total_borrows: i128 = env.storage().instance().get(&TOTAL_BORROWS).unwrap_or(0);
         env.storage().instance().set(&TOTAL_BORROWS, &(total_borrows - actual_repay));
+
+        // Custody: liquidator repays the debt; seized collateral is sent to them.
+        let asset = soroban_sdk::token::Client::new(&env, &Self::pool_asset(&env));
+        let vault = env.current_contract_address();
+        asset.transfer(&liquidator, &vault, &actual_repay);
+        asset.transfer(&vault, &liquidator, &collateral_seize);
 
         Ok(())
     }
@@ -472,6 +498,15 @@ impl LendingPool {
             return Err(PoolError::PoolPaused);
         }
         Ok(())
+    }
+
+    /// The pool's underlying asset (deposits, borrows, and collateral are all
+    /// denominated in this single asset).
+    fn pool_asset(env: &Env) -> Address {
+        env.storage()
+            .instance()
+            .get(&COLLATERAL_ASSET)
+            .unwrap_or_else(|| env.current_contract_address())
     }
 
     fn calculate_health_factor(env: &Env, user: &Address) -> Result<i128, PoolError> {

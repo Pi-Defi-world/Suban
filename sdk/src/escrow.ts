@@ -39,12 +39,12 @@ export class EscrowClient {
   // ─── Read Methods ─────────────────────────────────────────────────
 
   async getEscrow(escrowId: number): Promise<EscrowState> {
-    const result = await this.client.simulate(this.contractId, 'get_escrow_state', [escrowId]);
+    const result = await this.client.simulate(this.contractId, 'get_escrow', [escrowId]);
     return result as EscrowState;
   }
 
   async getEscrowCount(): Promise<number> {
-    const result = await this.client.simulate(this.contractId, 'get_escrow_count', []);
+    const result = await this.client.simulate(this.contractId, 'escrow_count', []);
     return result as number;
   }
 
@@ -73,7 +73,7 @@ export class EscrowClient {
     return this.client.invoke(
       this.contractId,
       'fund_escrow',
-      [funderKeypair.publicKey(), escrowId, amount],
+      [escrowId, amount],
       funderKeypair,
     );
   }
@@ -82,13 +82,13 @@ export class EscrowClient {
   async submitMilestone(
     escrowId: number,
     milestoneIdx: number,
-    receiverKeypair: Keypair,
+    workerKeypair: Keypair,
   ): Promise<TxResult> {
     return this.client.invoke(
       this.contractId,
       'submit_milestone',
-      [receiverKeypair.publicKey(), escrowId, milestoneIdx],
-      receiverKeypair,
+      [escrowId, milestoneIdx],
+      workerKeypair,
     );
   }
 
@@ -101,7 +101,7 @@ export class EscrowClient {
     return this.client.invoke(
       this.contractId,
       'approve_milestone',
-      [approverKeypair.publicKey(), escrowId, milestoneIdx],
+      [escrowId, milestoneIdx],
       approverKeypair,
     );
   }
@@ -110,13 +110,12 @@ export class EscrowClient {
   async rejectMilestone(
     escrowId: number,
     milestoneIdx: number,
-    reason: string,
     approverKeypair: Keypair,
   ): Promise<TxResult> {
     return this.client.invoke(
       this.contractId,
       'reject_milestone',
-      [approverKeypair.publicKey(), escrowId, milestoneIdx, reason],
+      [escrowId, milestoneIdx],
       approverKeypair,
     );
   }
@@ -126,7 +125,7 @@ export class EscrowClient {
     return this.client.invoke(
       this.contractId,
       'release_funds',
-      [funderKeypair.publicKey(), escrowId],
+      [escrowId],
       funderKeypair,
     );
   }
@@ -136,22 +135,22 @@ export class EscrowClient {
     return this.client.invoke(
       this.contractId,
       'refund',
-      [funderKeypair.publicKey(), escrowId],
+      [escrowId],
       funderKeypair,
     );
   }
 
   /** Dispute the escrow. */
-  async dispute(escrowId: number, reason: string, disputerKeypair: Keypair): Promise<TxResult> {
+  async dispute(escrowId: number, disputerKeypair: Keypair): Promise<TxResult> {
     return this.client.invoke(
       this.contractId,
       'dispute',
-      [disputerKeypair.publicKey(), escrowId, reason],
+      [escrowId, disputerKeypair.publicKey()],
       disputerKeypair,
     );
   }
 
-  /** Arbitrator resolves dispute. */
+  /** Arbitrator resolves dispute. `release` pays the receiver; otherwise refunds. */
   async resolve(
     escrowId: number,
     release: boolean,
@@ -160,7 +159,7 @@ export class EscrowClient {
     return this.client.invoke(
       this.contractId,
       'resolve',
-      [arbitratorKeypair.publicKey(), escrowId, release],
+      [escrowId, release ? 'release' : 'refund'],
       arbitratorKeypair,
     );
   }

@@ -13,6 +13,8 @@ use soroban_sdk::{
 
 const N: u128 = 2;
 const MAX_ITERATIONS: u32 = 256;
+/// Hard cap on the StableSwap amplification coefficient to bound price-manipulation risk.
+const MAX_AMPLIFICATION: u128 = 1_000_000;
 
 /// Compute D using Curve's standard Newton iteration.
 /// D_P = D^(n+1) / (n^n * prod(x_i))
@@ -97,6 +99,7 @@ pub enum DataKey {
     ReserveB,
     TotalShares,
     Amplification,
+    FeeBps,
     LpBalance(Address),
 }
 
@@ -139,7 +142,11 @@ fn read_total_shares(env: &Env) -> i128 {
 }
 
 fn write_total_shares(env: &Env, val: i128) {
-    env.storage().instance().set(&DataKey::TotalShares, &val);
+    env.storage().instance().set(&DataKey::TotalShares, &val)
+}
+
+fn read_fee_bps(env: &Env) -> u32 {
+    env.storage().instance().get::<DataKey, u32>(&DataKey::FeeBps).unwrap_or(30)
 }
 
 // ─── Contract ────────────────────────────────────────────────────────
@@ -160,6 +167,7 @@ impl Stableswap {
         admin.require_auth();
         if token_a == token_b { panic!("same token"); }
         if amplification == 0 { panic!("amp must be > 0"); }
+        if amplification > MAX_AMPLIFICATION { panic!("amp too high"); }
 
         env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage().instance().set(&DataKey::TokenA, &token_a);
@@ -168,6 +176,16 @@ impl Stableswap {
         write_reserve(&env, &DataKey::ReserveB, 0);
         write_total_shares(&env, 0);
         env.storage().instance().set(&DataKey::Amplification, &amplification);
+        env.storage().instance().set(&DataKey::FeeBps, &30u32);
+    }
+
+    /// Set the swap fee (basis points). Admin only.
+    pub fn set_fee(env: Env, admin: Address, fee_bps: u32) -> Result<(), StableswapError> {
+        if admin != read_admin(&env) { return Err(StableswapError::NotAdmin); }
+        admin.require_auth();
+        if fee_bps > 1000 { return Err(StableswapError::InvalidFee); }
+        env.storage().instance().set(&DataKey::FeeBps, &fee_bps);
+        Ok(())
     }
 
     pub fn add_liquidity(
@@ -251,13 +269,14 @@ impl Stableswap {
         let token_b_addr: Address = env.storage().instance().get(&DataKey::TokenB).unwrap();
         let vault = env.current_contract_address();
 
-        token::Client::new(&env, &token_a_addr).transfer(&vault, &provider, &(amount_a as i128));
-        token::Client::new(&env, &token_b_addr).transfer(&vault, &provider, &(amount_b as i128));
-
         write_lp_balance(&env, &provider, provider_shares - shares_in);
         write_reserve(&env, &DataKey::ReserveA, reserve_a - (amount_a as i128));
         write_reserve(&env, &DataKey::ReserveB, reserve_b - (amount_b as i128));
         write_total_shares(&env, total_shares - shares_in);
+
+        // CEI: update state before sending the outbound tokens.
+        token::Client::new(&env, &token_a_addr).transfer(&vault, &provider, &(amount_a as i128));
+        token::Client::new(&env, &token_b_addr).transfer(&vault, &provider, &(amount_b as i128));
 
         env.events().publish(
             (symbol_short!("ss_rm"), &provider),
@@ -305,24 +324,28 @@ impl Stableswap {
             amp,
         );
         let amount_out = (reserve_out as u128) - new_reserve_out;
+        let fee_bps = read_fee_bps(&env);
+        let amount_out_net = (amount_out as i128) * (10000 - fee_bps as i128) / 10000;
 
-        if (amount_out as i128) < min_amount_out {
+        if amount_out_net < min_amount_out {
             return Err(StableswapError::SlippageExceeded);
         }
 
         let vault = env.current_contract_address();
         token::Client::new(&env, &token_in).transfer(&trader, &vault, &amount_in);
-        token::Client::new(&env, &token_out_addr).transfer(&vault, &trader, &(amount_out as i128));
 
         write_reserve(&env, &reserve_in_key, reserve_in + amount_in);
-        write_reserve(&env, &reserve_out_key, reserve_out - (amount_out as i128));
+        write_reserve(&env, &reserve_out_key, reserve_out - amount_out_net);
+
+        // CEI: update reserves before sending the outbound tokens.
+        token::Client::new(&env, &token_out_addr).transfer(&vault, &trader, &amount_out_net);
 
         env.events().publish(
             (symbol_short!("ss_swap"), &trader),
-            (amount_in, amount_out as i128),
+            (amount_in, amount_out_net),
         );
 
-        Ok(amount_out as i128)
+        Ok(amount_out_net)
     }
 
     // ─── Queries ────────────────────────────────────────────────────
@@ -337,6 +360,10 @@ impl Stableswap {
 
     pub fn get_amplification(env: Env) -> u128 {
         env.storage().instance().get::<DataKey, u128>(&DataKey::Amplification).unwrap()
+    }
+
+    pub fn get_fee_bps(env: Env) -> u32 {
+        read_fee_bps(&env)
     }
 
     pub fn get_lp_balance(env: Env, owner: Address) -> i128 {
@@ -367,7 +394,9 @@ impl Stableswap {
 
         let amp = env.storage().instance().get::<DataKey, u128>(&DataKey::Amplification).unwrap();
         let new_ro = compute_y(ri as u128, amount_in as u128, ro as u128, amp);
-        Ok(((ro as u128) - new_ro) as i128)
+        let gross = ((ro as u128) - new_ro) as i128;
+        let fee_bps = read_fee_bps(&env);
+        Ok(gross * (10000 - fee_bps as i128) / 10000)
     }
 
     pub fn admin(env: Env) -> Address {

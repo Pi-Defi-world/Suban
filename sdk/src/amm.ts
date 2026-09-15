@@ -20,6 +20,7 @@ export interface CpmmState {
   reserveB: string;
   totalShares: string;
   feeBps: number;
+  amplification?: string;
 }
 
 export interface SwapResult {
@@ -38,8 +39,8 @@ export class PoolFactoryClient {
 
   /** Deploy a new pool. Returns (poolId, poolAddress). */
   async createPool(
-    wasmHash: string,
-    salt: string,
+    wasmHash: Uint8Array,
+    salt: Uint8Array,
     tokenA: string,
     tokenB: string,
     poolType: number,
@@ -190,8 +191,18 @@ export class CpmmPoolClient {
 
   /** Get pool state. */
   async getState(): Promise<CpmmState> {
-    const result = await this.client.simulate(this.contractId, 'get_pool_state', []);
-    return result as CpmmState;
+    const [reserves, totalShares, feeBps] = await Promise.all([
+      this.client.simulate(this.contractId, 'get_reserves', []) as Promise<[string, string]>,
+      this.client.simulate(this.contractId, 'get_total_shares', []) as Promise<string>,
+      this.client.simulate(this.contractId, 'get_fee_bps', []) as Promise<number>,
+    ]);
+    const [reserveA, reserveB] = reserves;
+    return {
+      reserveA: String(reserveA),
+      reserveB: String(reserveB),
+      totalShares: String(totalShares),
+      feeBps,
+    };
   }
 
   /** Get LP balance. */
@@ -268,8 +279,20 @@ export class StableswapClient {
 
   /** Get pool state. */
   async getState(): Promise<CpmmState> {
-    const result = await this.client.simulate(this.contractId, 'get_pool_state', []);
-    return result as CpmmState;
+    const [reserves, totalShares, feeBps, amplification] = await Promise.all([
+      this.client.simulate(this.contractId, 'get_reserves', []) as Promise<[string, string]>,
+      this.client.simulate(this.contractId, 'get_total_shares', []) as Promise<string>,
+      this.client.simulate(this.contractId, 'get_fee_bps', []) as Promise<number>,
+      this.client.simulate(this.contractId, 'get_amplification', []) as Promise<string>,
+    ]);
+    const [reserveA, reserveB] = reserves;
+    return {
+      reserveA: String(reserveA),
+      reserveB: String(reserveB),
+      totalShares: String(totalShares),
+      feeBps,
+      amplification: String(amplification),
+    };
   }
 }
 

@@ -14,7 +14,6 @@
 //! - Pause mechanism
 
 use soroban_sdk::{contract, contracterror, contractimpl, contracttype, symbol_short, Address, BytesN, Env, Symbol};
-use hub_errors::HubError;
 
 // ─── Storage Keys ─────────────────────────────────────────────────────
 
@@ -22,6 +21,8 @@ use hub_errors::HubError;
 #[derive(Clone)]
 pub enum DataKey {
     Admin,
+    WpiToken,
+    UsdcToken,
     Signer(Address),
     SignerCount,
     Threshold,
@@ -181,6 +182,8 @@ impl BridgeMultisig {
         volume_cap: i128,
         volume_window_ledgers: u32,
         max_proposal_age: u32,
+        wpi_token: Address,
+        usdc_token: Address,
     ) {
         if env.storage().instance().has(&DataKey::Admin) {
             panic!("already initialized");
@@ -193,6 +196,8 @@ impl BridgeMultisig {
         }
 
         env.storage().instance().set(&DataKey::Admin, &admin);
+        env.storage().instance().set(&DataKey::WpiToken, &wpi_token);
+        env.storage().instance().set(&DataKey::UsdcToken, &usdc_token);
         env.storage().instance().set(&DataKey::Threshold, &threshold);
         env.storage().instance().set(&DataKey::SignerCount, &signer_count);
         env.storage().instance().set(&DataKey::ProposalCount, &0u32);
@@ -360,6 +365,15 @@ impl BridgeMultisig {
                 // Update volume tracking
                 Self::add_volume(env, proposal.amount);
 
+                // Custody: the bridge (wPi admin) mints new wPi to the recipient.
+                let wpi = env
+                    .storage()
+                    .instance()
+                    .get::<DataKey, Address>(&DataKey::WpiToken)
+                    .unwrap();
+                soroban_sdk::token::StellarAssetClient::new(env, &wpi)
+                    .mint(&proposal.target.clone(), &proposal.amount);
+
                 env.events().publish(
                     (TOPIC_EXECUTE, symbol_short!("mint")),
                     (proposal.id, proposal.target.clone(), proposal.amount, proposal.deposit_id.clone()),
@@ -372,6 +386,16 @@ impl BridgeMultisig {
 
                 // Update volume tracking
                 Self::add_volume(env, proposal.amount);
+
+                // Custody: release USDC held by the bridge vault to the recipient.
+                let usdc = env
+                    .storage()
+                    .instance()
+                    .get::<DataKey, Address>(&DataKey::UsdcToken)
+                    .unwrap();
+                let vault = env.current_contract_address();
+                soroban_sdk::token::Client::new(env, &usdc)
+                    .transfer(&vault, &proposal.target.clone(), &proposal.amount);
 
                 env.events().publish(
                     (TOPIC_EXECUTE, symbol_short!("release")),
@@ -624,6 +648,20 @@ impl BridgeMultisig {
         read_admin(&env)
     }
 
+    pub fn wpi_token(env: Env) -> Address {
+        env.storage()
+            .instance()
+            .get::<DataKey, Address>(&DataKey::WpiToken)
+            .unwrap()
+    }
+
+    pub fn usdc_token(env: Env) -> Address {
+        env.storage()
+            .instance()
+            .get::<DataKey, Address>(&DataKey::UsdcToken)
+            .unwrap()
+    }
+
     pub fn paused(env: Env) -> bool {
         is_paused(&env)
     }
@@ -658,9 +696,50 @@ fn deposit_id_to_nonce(deposit_id: &BytesN<32>) -> u64 {
 mod test {
     extern crate std;
     use super::*;
-    use soroban_sdk::{testutils::{Address as _, Ledger}, Address, Env, BytesN};
+    use soroban_sdk::{contract, contractimpl, contracttype, testutils::{Address as _, Ledger}, Address, Env, BytesN};
 
-    fn setup() -> (Env, BridgeMultisigClient<'static>, Address, [Address; 3]) {
+    #[contract]
+    struct MockToken;
+
+    #[contracttype]
+    enum MockKey {
+        Bal(Address),
+    }
+
+    #[contractimpl]
+    impl MockToken {
+        pub fn initialize(_env: Env, _admin: Address) {}
+        pub fn mint(env: Env, to: Address, amount: i128) {
+            let b: i128 = env
+                .storage()
+                .instance()
+                .get::<MockKey, i128>(&MockKey::Bal(to.clone()))
+                .unwrap_or(0);
+            env.storage().instance().set(&MockKey::Bal(to), &(b + amount));
+        }
+        pub fn transfer(env: Env, from: Address, to: Address, amount: i128) {
+            let fb: i128 = env
+                .storage()
+                .instance()
+                .get::<MockKey, i128>(&MockKey::Bal(from.clone()))
+                .unwrap_or(0);
+            let tb: i128 = env
+                .storage()
+                .instance()
+                .get::<MockKey, i128>(&MockKey::Bal(to.clone()))
+                .unwrap_or(0);
+            env.storage().instance().set(&MockKey::Bal(from), &(fb - amount));
+            env.storage().instance().set(&MockKey::Bal(to), &(tb + amount));
+        }
+        pub fn balance(env: Env, addr: Address) -> i128 {
+            env.storage()
+                .instance()
+                .get::<MockKey, i128>(&MockKey::Bal(addr))
+                .unwrap_or(0)
+        }
+    }
+
+    fn setup() -> (Env, BridgeMultisigClient<'static>, Address, [Address; 3], Address, Address, Address) {
         let env = Env::default();
         env.mock_all_auths();
 
@@ -672,14 +751,19 @@ mod test {
         let signer2 = Address::generate(&env);
         let signer3 = Address::generate(&env);
 
+        let wpi = env.register(MockToken, ());
+        let usdc = env.register(MockToken, ());
+        MockTokenClient::new(&env, &wpi).initialize(&admin);
+        MockTokenClient::new(&env, &usdc).initialize(&admin);
+
         let mut signers = soroban_sdk::Vec::new(&env);
         signers.push_back(signer1.clone());
         signers.push_back(signer2.clone());
         signers.push_back(signer3.clone());
 
-        client.initialize(&admin, &signers, &2, &1_000_000_000, &100, &100);
+        client.initialize(&admin, &signers, &2, &1_000_000_000, &100, &100, &wpi, &usdc);
 
-        (env, client, admin, [signer1, signer2, signer3])
+        (env, client, admin, [signer1, signer2, signer3], wpi, usdc, contract_id)
     }
 
     fn make_deposit_id(env: &Env, seed: u8) -> BytesN<32> {
@@ -690,7 +774,7 @@ mod test {
 
     #[test]
     fn test_initialize() {
-        let (_env, client, admin, signers) = setup();
+        let (_env, client, admin, signers, _wpi, _usdc, _cid) = setup();
         assert_eq!(client.admin(), admin);
         assert_eq!(client.threshold(), 2);
         assert_eq!(client.signer_count(), 3);
@@ -699,7 +783,7 @@ mod test {
 
     #[test]
     fn test_propose_and_approve() {
-        let (env, client, _admin, signers) = setup();
+        let (env, client, _admin, signers, _wpi, _usdc, _cid) = setup();
 
         let deposit_id = make_deposit_id(&env, 1);
         let target = Address::generate(&env);
@@ -734,7 +818,7 @@ mod test {
 
     #[test]
     fn test_replay_protection() {
-        let (env, client, _admin, signers) = setup();
+        let (env, client, _admin, signers, _wpi, _usdc, _cid) = setup();
 
         let deposit_id = make_deposit_id(&env, 1);
         let target = Address::generate(&env);
@@ -763,7 +847,7 @@ mod test {
 
     #[test]
     fn test_volume_circuit_breaker() {
-        let (env, client, _admin, signers) = setup();
+        let (env, client, _admin, signers, _wpi, _usdc, _cid) = setup();
 
         let target = Address::generate(&env);
 
@@ -803,7 +887,7 @@ mod test {
 
     #[test]
     fn test_threshold_not_met() {
-        let (env, client, _admin, signers) = setup();
+        let (env, client, _admin, signers, _wpi, _usdc, _cid) = setup();
 
         let deposit_id = make_deposit_id(&env, 1);
         let target = Address::generate(&env);
@@ -824,7 +908,7 @@ mod test {
 
     #[test]
     fn test_duplicate_approval_fails() {
-        let (env, client, _admin, signers) = setup();
+        let (env, client, _admin, signers, _wpi, _usdc, _cid) = setup();
 
         let deposit_id = make_deposit_id(&env, 1);
         let target = Address::generate(&env);
@@ -844,7 +928,7 @@ mod test {
 
     #[test]
     fn test_non_signer_cannot_propose() {
-        let (env, client, _admin, _signers) = setup();
+        let (env, client, _admin, _signers, _wpi, _usdc, _cid) = setup();
 
         let rando = Address::generate(&env);
         let deposit_id = make_deposit_id(&env, 1);
@@ -862,7 +946,7 @@ mod test {
 
     #[test]
     fn test_admin_add_remove_signer() {
-        let (env, client, admin, signers) = setup();
+        let (env, client, admin, signers, _wpi, _usdc, _cid) = setup();
 
         let new_signer = Address::generate(&env);
 
@@ -879,7 +963,7 @@ mod test {
 
     #[test]
     fn test_cannot_remove_below_threshold() {
-        let (env, client, admin, signers) = setup();
+        let (env, client, admin, signers, _wpi, _usdc, _cid) = setup();
 
         // Threshold is 2, we have 3 signers. Removing one leaves 2 >= threshold. OK.
         client.remove_signer(&admin, &signers[2]);
@@ -892,7 +976,7 @@ mod test {
 
     #[test]
     fn test_admin_set_threshold() {
-        let (env, client, admin, _signers) = setup();
+        let (env, client, admin, _signers, _wpi, _usdc, _cid) = setup();
 
         client.set_threshold(&admin, &3);
         assert_eq!(client.threshold(), 3);
@@ -900,7 +984,7 @@ mod test {
 
     #[test]
     fn test_pause_unpause() {
-        let (env, client, admin, _signers) = setup();
+        let (env, client, admin, _signers, _wpi, _usdc, _cid) = setup();
 
         client.pause(&admin);
         assert!(client.paused());
@@ -911,7 +995,7 @@ mod test {
 
     #[test]
     fn test_cannot_propose_when_paused() {
-        let (env, client, admin, signers) = setup();
+        let (env, client, admin, signers, _wpi, _usdc, _cid) = setup();
 
         client.pause(&admin);
 
@@ -930,7 +1014,7 @@ mod test {
 
     #[test]
     fn test_proposal_expiration() {
-        let (env, client, _admin, signers) = setup();
+        let (env, client, _admin, signers, _wpi, _usdc, _cid) = setup();
 
         let deposit_id = make_deposit_id(&env, 1);
         let target = Address::generate(&env);
@@ -952,7 +1036,7 @@ mod test {
 
     #[test]
     fn test_volume_stats() {
-        let (env, client, _admin, signers) = setup();
+        let (env, client, _admin, signers, _wpi, _usdc, _cid) = setup();
 
         let target = Address::generate(&env);
         let deposit_id = make_deposit_id(&env, 1);
@@ -969,5 +1053,48 @@ mod test {
         let (volume, _start, _window, cap) = client.volume_stats();
         assert_eq!(volume, 100_000_000);
         assert_eq!(cap, 1_000_000_000);
+    }
+
+    #[test]
+    fn test_execute_mint_custody() {
+        let (env, client, _admin, signers, wpi, _usdc, _cid) = setup();
+        let deposit_id = make_deposit_id(&env, 1);
+        let target = Address::generate(&env);
+
+        let proposal_id = client.propose(
+            &signers[0],
+            &ProposalKind::MintWpi,
+            &target,
+            &100_000_000,
+            &deposit_id,
+        );
+        client.approve(&signers[1], &proposal_id);
+
+        // wPi was actually minted to the recipient.
+        assert_eq!(MockTokenClient::new(&env, &wpi).balance(&target), 100_000_000);
+    }
+
+    #[test]
+    fn test_execute_release_custody() {
+        let (env, client, _admin, signers, _wpi, usdc, cid) = setup();
+        let deposit_id = make_deposit_id(&env, 1);
+        let target = Address::generate(&env);
+
+        // Fund the bridge vault (this contract) with USDC.
+        let bridge = cid;
+        MockTokenClient::new(&env, &usdc).mint(&bridge, &500_000_000);
+
+        let proposal_id = client.propose(
+            &signers[0],
+            &ProposalKind::ReleaseUsdc,
+            &target,
+            &100_000_000,
+            &deposit_id,
+        );
+        client.approve(&signers[1], &proposal_id);
+
+        // USDC was actually released from the vault to the recipient.
+        assert_eq!(MockTokenClient::new(&env, &usdc).balance(&target), 100_000_000);
+        assert_eq!(MockTokenClient::new(&env, &usdc).balance(&bridge), 400_000_000);
     }
 }

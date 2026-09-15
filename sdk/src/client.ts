@@ -2,6 +2,7 @@ import {
   contract,
   Keypair,
   rpc,
+  scValToNative,
 } from '@stellar/stellar-sdk';
 
 export interface SubanConfig {
@@ -52,20 +53,26 @@ export class SubanClient {
   }
 
   /**
-   * Simulate a read-only contract call.
+   * Simulate a read-only contract call and decode the return value into a
+   * native JS value (3.1).
    */
   async simulate(contractId: string, method: string, args: unknown[] = []): Promise<unknown> {
     const keypair = Keypair.random();
     const client = await this.getContractClient(contractId, keypair.publicKey());
     // @ts-expect-error - dynamic method
     const tx = await client[method](...args);
-    const result = await tx.simulate();
-    return result;
+    const sim = await tx.simulate();
+    const retval = (sim as unknown as { simulationResult?: { result?: unknown } }).simulationResult?.result;
+    if (retval === undefined) {
+      return null;
+    }
+    return scValToNative(retval as never);
   }
 
   /**
-   * Build, simulate, and submit a transaction.
-   * `signFn` is called with the built transaction XDR for the caller to sign.
+   * Build, simulate, sign, submit, and **confirm** a transaction (3.5).
+   * Polls `getTransaction` until the tx reaches SUCCESS / FAILED / NOT_FOUND,
+   * so the caller knows the outcome instead of just the submission receipt.
    */
   async invoke(
     contractId: string,
@@ -78,8 +85,25 @@ export class SubanClient {
     const tx = await client[method](...args);
     const builtTx = await tx.build();
     builtTx.sign(sourceKeypair);
-    const result = await this.server.sendTransaction(builtTx);
-    return { txHash: result.hash, result };
+    const sendResult = await this.server.sendTransaction(builtTx);
+
+    // If the network already resolved it (unusual), return as-is.
+    if (sendResult.status && sendResult.status !== 'PENDING') {
+      return { txHash: sendResult.hash, result: sendResult };
+    }
+
+    const hash = sendResult.hash;
+    const maxAttempts = 30;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      await new Promise((r) => setTimeout(r, 1000));
+      const txr = await this.server.getTransaction(hash);
+      if (txr.status === 'SUCCESS' || txr.status === 'FAILED') {
+        return { txHash: hash, result: txr };
+      }
+      // NOT_FOUND means not yet included; keep polling.
+    }
+    // Timed out waiting; return the hash so the caller can re-check later.
+    return { txHash: hash, result: sendResult };
   }
 
   /**

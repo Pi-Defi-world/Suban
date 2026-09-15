@@ -51,29 +51,50 @@ export class BridgeClient {
 
   // ─── Write Methods ────────────────────────────────────────────────
 
-  /** Propose a new mint. Returns proposal ID. */
-  async proposeMint(
-    depositId: string,
-    to: string,
+  /** Propose a bridge operation (3.2/3.3). Maps to `propose(kind, target, amount, deposit_id)`. */
+  async propose(
+    kind: number,
+    target: string,
     amount: string,
-    depositorKeypair: Keypair,
+    depositId: Uint8Array,
+    proposerKeypair: Keypair,
   ): Promise<TxResult> {
     return this.client.invoke(
       this.contractId,
-      'propose_mint',
-      [depositorKeypair.publicKey(), depositId, to, amount],
-      depositorKeypair,
+      'propose',
+      [proposerKeypair.publicKey(), kind, target, amount, depositId],
+      proposerKeypair,
     );
   }
 
-  /** Approve a pending mint proposal. */
+  /** Propose a wPi mint from a confirmed Pi deposit (kind = MintWpi = 0). */
+  async proposeMint(
+    to: string,
+    amount: string,
+    depositId: Uint8Array,
+    proposerKeypair: Keypair,
+  ): Promise<TxResult> {
+    return this.propose(0, to, amount, depositId, proposerKeypair);
+  }
+
+  /** Propose releasing USDC from the vault for a redemption (kind = ReleaseUsdc = 1). */
+  async proposeReleaseUsdc(
+    from: string,
+    amount: string,
+    depositId: Uint8Array,
+    proposerKeypair: Keypair,
+  ): Promise<TxResult> {
+    return this.propose(1, from, amount, depositId, proposerKeypair);
+  }
+
+  /** Approve a pending proposal (executes automatically once threshold is met). */
   async approveMint(
     proposalId: number,
     signerKeypair: Keypair,
   ): Promise<TxResult> {
     return this.client.invoke(
       this.contractId,
-      'approve_mint',
+      'approve',
       [signerKeypair.publicKey(), proposalId],
       signerKeypair,
     );

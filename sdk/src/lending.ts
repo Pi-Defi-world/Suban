@@ -48,7 +48,7 @@ export class LendingClient {
   async depositCollateral(amount: string, userKeypair: Keypair): Promise<TxResult> {
     return this.client.invoke(
       this.contractId,
-      'deposit_collateral',
+      'deposit',
       [userKeypair.publicKey(), amount],
       userKeypair,
     );
@@ -58,7 +58,7 @@ export class LendingClient {
   async withdrawCollateral(amount: string, userKeypair: Keypair): Promise<TxResult> {
     return this.client.invoke(
       this.contractId,
-      'withdraw_collateral',
+      'withdraw',
       [userKeypair.publicKey(), amount],
       userKeypair,
     );
@@ -85,11 +85,16 @@ export class LendingClient {
   }
 
   /** Liquidate an undercollateralized position. */
-  async liquidate(userToLiquidate: string, repayAmount: string, keeperKeypair: Keypair): Promise<TxResult> {
+  async liquidate(
+    userToLiquidate: string,
+    repayAmount: string,
+    minCollateral: string,
+    keeperKeypair: Keypair,
+  ): Promise<TxResult> {
     return this.client.invoke(
       this.contractId,
       'liquidate',
-      [keeperKeypair.publicKey(), userToLiquidate, repayAmount],
+      [keeperKeypair.publicKey(), userToLiquidate, repayAmount, minCollateral],
       keeperKeypair,
     );
   }

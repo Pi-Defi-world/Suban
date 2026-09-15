@@ -92,8 +92,10 @@ impl PoolFactory {
     }
 
     /// Deploy a new pool from a pre-uploaded WASM hash.
-    /// Caller must upload WASM beforehand: `env.deployer().upload_contract_wasm(wasm_bytes)`.
-    /// Returns (pool_id, pool_address) — caller must invoke pool.initialize() separately.
+    /// Caller must upload WASM beforehand (`env.deployer().upload_contract_wasm`)
+    /// and then initialize the deployed pool itself. NOTE: the deploy→initialize
+    /// gap is a known TOCTOU window (see remediation plan 2.7); fully closing it
+    /// requires a shared client-crate refactor and is deferred.
     pub fn create_pool(
         env: Env,
         caller: Address,

@@ -7,6 +7,8 @@ use soroban_sdk::{
 
 const POOL_ADMIN: Symbol = symbol_short!("admin");
 const POOL_ADDRESS: Symbol = symbol_short!("pool");
+const BACKSTOP_ASSET: Symbol = symbol_short!("asset");
+const CLAIM_REQUESTS: Symbol = symbol_short!("clmReq");
 const BACKSTOP_BALANCE: Symbol = symbol_short!("balance");
 const BACKSTOP_TARGET: Symbol = symbol_short!("target");
 const DEPOSITORS: Symbol = symbol_short!("depos");
@@ -64,6 +66,7 @@ impl Backstop {
         env: Env,
         admin: Address,
         pool: Address,
+        asset: Address,
         target: i128,
         claim_delay: u32,
         max_deposit: i128,
@@ -75,6 +78,7 @@ impl Backstop {
 
         env.storage().instance().set(&POOL_ADMIN, &admin);
         env.storage().instance().set(&POOL_ADDRESS, &pool);
+        env.storage().instance().set(&BACKSTOP_ASSET, &asset);
         env.storage().instance().set(&BACKSTOP_TARGET, &target);
         env.storage().instance().set(&CLAIM_DELAY, &claim_delay);
         env.storage().instance().set(&MAX_DEPOSIT, &max_deposit);
@@ -139,8 +143,13 @@ impl Backstop {
             .get(&DEPOSITORS)
             .unwrap_or(Map::new(&env));
         let current_deposit = deposits.get(from.clone()).unwrap_or(0);
-        deposits.set(from, current_deposit + amount);
+        deposits.set(from.clone(), current_deposit + amount);
         env.storage().instance().set(&DEPOSITORS, &deposits);
+
+        // Custody: pull the deposited underlying from the depositor into the backstop.
+        let asset = soroban_sdk::token::Client::new(&env, &Self::backstop_asset(&env));
+        let vault = env.current_contract_address();
+        asset.transfer(&from, &vault, &amount);
 
         Ok(shares)
     }
@@ -185,19 +194,66 @@ impl Backstop {
             .get(&DEPOSITORS)
             .unwrap_or(Map::new(&env));
         let current_deposit = deposits.get(from.clone()).unwrap_or(0);
-        deposits.set(from, current_deposit - amount);
+        deposits.set(from.clone(), current_deposit - amount);
         env.storage().instance().set(&DEPOSITORS, &deposits);
+
+        // Custody: return the underlying to the depositor.
+        let asset = soroban_sdk::token::Client::new(&env, &Self::backstop_asset(&env));
+        let vault = env.current_contract_address();
+        asset.transfer(&vault, &from, &amount);
 
         Ok(amount)
     }
 
-    /// Claim a share of bad debt absorbed by the backstop
+    /// Request to claim a share of bad debt absorbed by the backstop.
+    /// The actual payout is released only after `claim_delay` ledgers have passed.
+    pub fn request_claim(env: Env, from: Address, shares: i128) -> Result<(), BackstopError> {
+        if shares <= 0 {
+            return Err(BackstopError::ZeroAmount);
+        }
+        Self::require_not_paused(&env)?;
+        from.require_auth();
+
+        let mut requests: Map<Address, ClaimRequest> = env
+            .storage()
+            .instance()
+            .get(&CLAIM_REQUESTS)
+            .unwrap_or(Map::new(&env));
+        requests.set(
+            from.clone(),
+            ClaimRequest {
+                depositor: from.clone(),
+                shares,
+                requested_at: env.ledger().sequence(),
+            },
+        );
+        env.storage().instance().set(&CLAIM_REQUESTS, &requests);
+
+        Ok(())
+    }
+
+    /// Claim a share of bad debt absorbed by the backstop.
+    /// Requires a prior `request_claim` and that `claim_delay` ledgers have elapsed.
     pub fn claim(env: Env, from: Address, shares: i128) -> Result<i128, BackstopError> {
         if shares <= 0 {
             return Err(BackstopError::ZeroAmount);
         }
         Self::require_not_paused(&env)?;
         from.require_auth();
+
+        let claim_delay: u32 = env.storage().instance().get(&CLAIM_DELAY).unwrap_or(0);
+        let mut requests: Map<Address, ClaimRequest> = env
+            .storage()
+            .instance()
+            .get(&CLAIM_REQUESTS)
+            .unwrap_or(Map::new(&env));
+        let request = requests.get(from.clone()).ok_or(BackstopError::ClaimPending)?;
+        let now = env.ledger().sequence();
+        if now < request.requested_at + claim_delay {
+            return Err(BackstopError::ClaimPending);
+        }
+        requests.remove(from.clone());
+        env.storage().instance().set(&CLAIM_REQUESTS, &requests);
 
         let depositor_shares: Map<Address, i128> = env
             .storage()
@@ -215,7 +271,7 @@ impl Backstop {
         let balance: i128 = env.storage().instance().get(&BACKSTOP_BALANCE).unwrap_or(0);
 
         // Calculate payout from bad debt absorbed
-        let payout = if total_deposits > 0 {
+        let payout = if total_shares > 0 {
             (shares * balance) / total_shares
         } else {
             0
@@ -227,7 +283,7 @@ impl Backstop {
 
         // Update depositor shares
         let mut depositor_shares_mut = depositor_shares;
-        depositor_shares_mut.set(from, current_shares - shares);
+        depositor_shares_mut.set(from.clone(), current_shares - shares);
         env.storage().instance().set(&DEPOSITOR_SHARES, &depositor_shares_mut);
 
         // Update totals
@@ -237,21 +293,32 @@ impl Backstop {
         // Update balance
         env.storage().instance().set(&BACKSTOP_BALANCE, &(balance - payout));
 
+        // Custody: release the payout to the depositor.
+        let asset = soroban_sdk::token::Client::new(&env, &Self::backstop_asset(&env));
+        let vault = env.current_contract_address();
+        asset.transfer(&vault, &from, &payout);
+
         Ok(payout)
     }
 
-    /// Absorb bad debt from the lending pool (called by pool during liquidation)
+    /// Absorb bad debt from the lending pool (called by pool during liquidation).
+    /// Only the configured pool may call this; the covered tokens are sent to the pool.
     pub fn absorb_bad_debt(env: Env, amount: i128) -> Result<(), BackstopError> {
         Self::require_not_paused(&env)?;
 
+        let pool: Address = env.storage().instance().get(&POOL_ADDRESS).unwrap();
+        pool.require_auth();
+
         let balance: i128 = env.storage().instance().get(&BACKSTOP_BALANCE).unwrap_or(0);
 
-        if amount > balance {
-            env.storage().instance().set(&BACKSTOP_BALANCE, &0i128);
-            return Ok(());
-        }
+        let covered = if amount > balance { balance } else { amount };
 
-        env.storage().instance().set(&BACKSTOP_BALANCE, &(balance - amount));
+        env.storage().instance().set(&BACKSTOP_BALANCE, &(balance - covered));
+
+        // Custody: send the covered balance to the pool to settle the bad debt.
+        let asset = soroban_sdk::token::Client::new(&env, &Self::backstop_asset(&env));
+        let vault = env.current_contract_address();
+        asset.transfer(&vault, &pool, &covered);
 
         Ok(())
     }
@@ -290,6 +357,13 @@ impl Backstop {
         Ok(())
     }
 
+    fn backstop_asset(env: &Env) -> Address {
+        env.storage()
+            .instance()
+            .get(&BACKSTOP_ASSET)
+            .unwrap_or_else(|| env.current_contract_address())
+    }
+
     fn require_not_paused(env: &Env) -> Result<(), BackstopError> {
         let paused: bool = env.storage().instance().get(&PAUSED).unwrap_or(false);
         if paused {
@@ -303,9 +377,44 @@ impl Backstop {
 mod tests {
     extern crate std;
     use super::*;
-    use soroban_sdk::testutils::Address as _;
+    use soroban_sdk::{contract, contractimpl, contracttype, testutils::Address as _, testutils::Ledger as _};
 
-    fn setup() -> (Env, BackstopClient<'static>, Address, Address) {
+    #[contract]
+    struct MockToken;
+
+    #[contracttype]
+    enum MockKey {
+        Bal(Address),
+    }
+
+    #[contractimpl]
+    impl MockToken {
+        pub fn initialize(_env: Env, _admin: Address) {}
+        pub fn mint(env: Env, to: Address, amount: i128) {
+            let b: i128 = env
+                .storage()
+                .instance()
+                .get::<MockKey, i128>(&MockKey::Bal(to.clone()))
+                .unwrap_or(0);
+            env.storage().instance().set(&MockKey::Bal(to), &(b + amount));
+        }
+        pub fn transfer(env: Env, from: Address, to: Address, amount: i128) {
+            let fb: i128 = env
+                .storage()
+                .instance()
+                .get::<MockKey, i128>(&MockKey::Bal(from.clone()))
+                .unwrap_or(0);
+            let tb: i128 = env
+                .storage()
+                .instance()
+                .get::<MockKey, i128>(&MockKey::Bal(to.clone()))
+                .unwrap_or(0);
+            env.storage().instance().set(&MockKey::Bal(from), &(fb - amount));
+            env.storage().instance().set(&MockKey::Bal(to), &(tb + amount));
+        }
+    }
+
+    fn setup() -> (Env, BackstopClient<'static>, Address, Address, Address) {
         let env = Env::default();
         env.mock_all_auths();
 
@@ -313,15 +422,21 @@ mod tests {
         let client = BackstopClient::new(&env, &contract_id);
         let admin = Address::generate(&env);
         let pool = Address::generate(&env);
+        let asset = env.register(MockToken, ());
+        MockTokenClient::new(&env, &asset).initialize(&admin);
 
-        client.initialize(&admin, &pool, &1000000, &100, &100000, &100);
+        client.initialize(&admin, &pool, &asset, &1000000, &100, &100000, &100);
 
-        (env, client, admin, pool)
+        (env, client, admin, pool, asset)
+    }
+
+    fn fund(env: &Env, asset: &Address, to: &Address, amount: i128) {
+        MockTokenClient::new(env, asset).mint(to, &amount);
     }
 
     #[test]
     fn test_initialize() {
-        let (_env, client, _admin, _pool) = setup();
+        let (env, client, _admin, _pool, _asset) = setup();
 
         let state = client.get_state();
         assert_eq!(state.total_shares, 0);
@@ -335,9 +450,10 @@ mod tests {
 
     #[test]
     fn test_deposit() {
-        let (env, client, _admin, _pool) = setup();
+        let (env, client, _admin, _pool, asset) = setup();
 
         let depositor = Address::generate(&env);
+        fund(&env, &asset, &depositor, 1000);
         let shares = client.deposit(&depositor, &1000);
 
         assert!(shares > 0);
@@ -349,7 +465,7 @@ mod tests {
 
     #[test]
     fn test_deposit_too_small() {
-        let (env, client, _admin, _pool) = setup();
+        let (env, client, _admin, _pool, _asset) = setup();
 
         let depositor = Address::generate(&env);
         let result = client.try_deposit(&depositor, &50);
@@ -359,7 +475,7 @@ mod tests {
 
     #[test]
     fn test_deposit_too_large() {
-        let (env, client, _admin, _pool) = setup();
+        let (env, client, _admin, _pool, _asset) = setup();
 
         let depositor = Address::generate(&env);
         let result = client.try_deposit(&depositor, &200000);
@@ -369,7 +485,7 @@ mod tests {
 
     #[test]
     fn test_zero_amount_deposit() {
-        let (env, client, _admin, _pool) = setup();
+        let (env, client, _admin, _pool, _asset) = setup();
 
         let depositor = Address::generate(&env);
         let result = client.try_deposit(&depositor, &0);
@@ -379,9 +495,10 @@ mod tests {
 
     #[test]
     fn test_withdraw() {
-        let (env, client, _admin, _pool) = setup();
+        let (env, client, _admin, _pool, asset) = setup();
 
         let depositor = Address::generate(&env);
+        fund(&env, &asset, &depositor, 1000);
         let shares = client.deposit(&depositor, &1000);
 
         let withdrawn = client.withdraw(&depositor, &shares);
@@ -394,9 +511,10 @@ mod tests {
 
     #[test]
     fn test_withdraw_insufficient_shares() {
-        let (env, client, _admin, _pool) = setup();
+        let (env, client, _admin, _pool, asset) = setup();
 
         let depositor = Address::generate(&env);
+        fund(&env, &asset, &depositor, 1000);
         let _shares = client.deposit(&depositor, &1000);
 
         let result = client.try_withdraw(&depositor, &9999);
@@ -405,12 +523,13 @@ mod tests {
 
     #[test]
     fn test_absorb_bad_debt() {
-        let (env, client, _admin, _pool) = setup();
+        let (env, client, _admin, _pool, asset) = setup();
 
         let depositor = Address::generate(&env);
+        fund(&env, &asset, &depositor, 10000);
         client.deposit(&depositor, &10000);
 
-        // Simulate bad debt absorption
+        // Simulate bad debt absorption (covered tokens are sent to the pool).
         client.absorb_bad_debt(&5000);
 
         let state = client.get_state();
@@ -418,15 +537,25 @@ mod tests {
     }
 
     #[test]
-    fn test_claim() {
-        let (env, client, _admin, _pool) = setup();
+    fn test_claim_requires_request_and_delay() {
+        let (env, client, _admin, _pool, asset) = setup();
 
         let depositor = Address::generate(&env);
+        fund(&env, &asset, &depositor, 10000);
         let shares = client.deposit(&depositor, &10000);
 
-        // Absorb some bad debt first
-        client.absorb_bad_debt(&5000);
+        // Claim without a prior request fails.
+        let no_request = client.try_claim(&depositor, &shares);
+        assert_eq!(no_request, Err(Ok(BackstopError::ClaimPending)));
 
+        // Request, but claim too early (delay not elapsed) fails.
+        client.request_claim(&depositor, &shares);
+        let too_early = client.try_claim(&depositor, &shares);
+        assert_eq!(too_early, Err(Ok(BackstopError::ClaimPending)));
+
+        // Advance past the claim delay and claim successfully.
+        env.ledger()
+            .set_sequence_number(env.ledger().sequence() + client.get_state().claim_delay + 1);
         let payout = client.claim(&depositor, &shares);
         assert!(payout > 0);
 
@@ -436,13 +565,17 @@ mod tests {
 
     #[test]
     fn test_claim_no_bad_debt() {
-        let (env, client, _admin, _pool) = setup();
+        let (env, client, _admin, _pool, asset) = setup();
 
         let depositor = Address::generate(&env);
+        fund(&env, &asset, &depositor, 10000);
         let shares = client.deposit(&depositor, &10000);
 
-        // With only deposits and no absorbed bad debt, claim should return
-        // the proportional share of the balance (which equals the deposit).
+        // With only deposits and no absorbed bad debt, claim returns the
+        // proportional share of the balance (which equals the deposit).
+        client.request_claim(&depositor, &shares);
+        env.ledger()
+            .set_sequence_number(env.ledger().sequence() + client.get_state().claim_delay + 1);
         let payout = client.claim(&depositor, &shares);
         assert_eq!(payout, 10000);
 
@@ -452,7 +585,7 @@ mod tests {
 
     #[test]
     fn test_set_paused() {
-        let (env, client, admin, _pool) = setup();
+        let (env, client, admin, _pool, _asset) = setup();
 
         client.set_paused(&admin, &true);
 
@@ -464,7 +597,7 @@ mod tests {
 
     #[test]
     fn test_set_paused_not_admin() {
-        let (env, client, _admin, _pool) = setup();
+        let (env, client, _admin, _pool, _asset) = setup();
 
         let not_admin = Address::generate(&env);
         let result = client.try_set_paused(&not_admin, &true);
@@ -474,9 +607,10 @@ mod tests {
 
     #[test]
     fn test_get_shares() {
-        let (env, client, _admin, _pool) = setup();
+        let (env, client, _admin, _pool, asset) = setup();
 
         let depositor = Address::generate(&env);
+        fund(&env, &asset, &depositor, 1000);
         let shares = client.deposit(&depositor, &1000);
 
         let stored_shares = client.get_shares(&depositor);

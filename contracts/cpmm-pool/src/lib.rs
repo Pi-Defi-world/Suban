@@ -236,14 +236,15 @@ impl CpmmPool {
         let token_b_addr: Address = env.storage().instance().get(&DataKey::TokenB).unwrap();
         let vault = env.current_contract_address();
 
-        token::Client::new(&env, &token_a_addr).transfer(&vault, &provider, &amount_a);
-        token::Client::new(&env, &token_b_addr).transfer(&vault, &provider, &amount_b);
-
         write_lp_balance(&env, &provider, provider_shares - shares_in);
 
         write_reserve_a(&env, reserve_a - amount_a);
         write_reserve_b(&env, reserve_b - amount_b);
         write_total_shares(&env, total_shares - shares_in);
+
+        // CEI: update state before sending the outbound tokens.
+        token::Client::new(&env, &token_a_addr).transfer(&vault, &provider, &amount_a);
+        token::Client::new(&env, &token_b_addr).transfer(&vault, &provider, &amount_b);
 
         env.events().publish(
             (symbol_short!("rm_liq"), &provider),
@@ -292,7 +293,6 @@ impl CpmmPool {
 
         let vault = env.current_contract_address();
         token::Client::new(&env, &token_in).transfer(&trader, &vault, &amount_in);
-        token::Client::new(&env, &token_out_addr).transfer(&vault, &trader, &amount_out);
 
         if swap_to_a {
             write_reserve_a(&env, reserve_out - amount_out);
@@ -301,6 +301,9 @@ impl CpmmPool {
             write_reserve_a(&env, reserve_in + amount_in);
             write_reserve_b(&env, reserve_out - amount_out);
         }
+
+        // CEI: update reserves before sending the outbound tokens.
+        token::Client::new(&env, &token_out_addr).transfer(&vault, &trader, &amount_out);
 
         env.events().publish(
             (symbol_short!("swap"), &trader),

@@ -69,9 +69,10 @@ impl EscrowFactory {
         env.storage().instance().set(&DataKey::InstanceCount, &0u32);
     }
 
-    /// Deploy a new escrow instance from a pre-uploaded WASM hash.
-    /// Returns (instance_id, contract_address).
-    /// Caller must then invoke escrow.initialize() on the returned address.
+    /// Deploy a new escrow instance from a pre-uploaded WASM hash and return its
+    /// address. The caller is responsible for initializing the deployed instance.
+    /// NOTE: the deploy→initialize gap is a known TOCTOU window (see remediation
+    /// plan 2.7); fully closing it requires a shared client-crate refactor and is deferred.
     pub fn create_escrow(
         env: Env,
         caller: Address,

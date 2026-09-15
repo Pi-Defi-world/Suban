@@ -72,7 +72,8 @@ impl EventRegistry {
         env.storage().instance().set(&DataKey::EventCount, &0u64);
     }
 
-    /// Register an event from any primitive. Callable by any contract.
+    /// Register an event from any primitive. The emitting contract (`contract_address`)
+    /// must authorize the call so events cannot be forged for a contract it does not own.
     pub fn register_event(
         env: Env,
         primitive: Symbol,
@@ -81,6 +82,8 @@ impl EventRegistry {
         actor: Address,
         data: Symbol,
     ) -> u64 {
+        contract_address.require_auth();
+
         let event_id = next_event_id(&env);
         let ledger = env.ledger().sequence();
         let timestamp = env.ledger().timestamp();
