@@ -1,10 +1,13 @@
 /**
- * Event Indexer — off-chain service that listens to all Zyrachain contract events
+ * Event Indexer — off-chain service that listens to all Suban contract events
  * and stores them in a queryable SQLite database.
+ * Includes an HTTP API for querying events.
  */
 
-import { rpc, Contract, Address } from '@stellar/stellar-sdk';
+import { rpc } from '@stellar/stellar-sdk';
 import Database from 'better-sqlite3';
+import express from 'express';
+import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -17,6 +20,7 @@ interface IndexerConfig {
   networkPassphrase: string;
   dbPath: string;
   pollIntervalMs: number;
+  apiPort: number;
   contracts: {
     name: string;
     contractId: string;
@@ -28,6 +32,7 @@ const DEFAULT_CONFIG: IndexerConfig = {
   networkPassphrase: process.env.PI_NETWORK_PASSPHRASE || 'Pi Testnet',
   dbPath: process.env.INDEXER_DB_PATH || path.join(__dirname, '..', 'events.db'),
   pollIntervalMs: parseInt(process.env.INDEXER_POLL_MS || '10000'),
+  apiPort: parseInt(process.env.INDEXER_API_PORT || '3002'),
   contracts: [
     { name: 'pool-factory', contractId: process.env.POOL_FACTORY_CONTRACT_ID || '' },
     { name: 'cpmm-pool', contractId: process.env.CPMM_POOL_CONTRACT_ID || '' },
@@ -83,9 +88,11 @@ class EventIndexer {
   private db: Database.Database;
   private config: IndexerConfig;
   private running = false;
+  private pollCount = 0;
+  private totalEvents = 0;
 
   constructor(config: IndexerConfig) {
-    this.server = new rpc.Server(config.rpcUrl);
+    this.server = new rpc.Server(config.rpcUrl, { allowHttp: true });
     this.db = initDatabase(config.dbPath);
     this.config = config;
   }
@@ -114,7 +121,6 @@ class EventIndexer {
 
       const events = await this.server.getEvents({
         startLedger: fromLedger + 1,
-        endLedger: toLedger,
         filters: [{
           type: 'contract',
           contractIds: [contractId],
@@ -123,8 +129,8 @@ class EventIndexer {
       });
 
       return events.events || [];
-    } catch (err) {
-      console.error(`Error fetching events for ${contractId}:`, err);
+    } catch (err: any) {
+      console.error(`Error fetching events for ${contractId}:`, err.message || err);
       return [];
     }
   }
@@ -155,20 +161,21 @@ class EventIndexer {
 
     for (const event of events) {
       const ledger = parseInt(String(event.ledger || '0'));
-      const txHash = event.transactionHash || '';
+      const txHash = (event as any).txHash || (event as any).transactionHash || '';
       const timestamp = Math.floor(Date.now() / 1000);
 
-      // Extract event type from topics
       let eventType = 'unknown';
       let data = '';
-      if (event.topics && event.topics.length > 0) {
-        eventType = String(event.topics[0]);
+      const topic = (event as any).topic || (event as any).topics;
+      if (topic && topic.length > 0) {
+        eventType = String(topic[0]);
       }
       if (event.value) {
         data = JSON.stringify(event.value);
       }
 
       this.storeEvent(contractId, name, eventType, txHash, ledger, timestamp, data);
+      this.totalEvents++;
 
       if (ledger > maxLedger) {
         maxLedger = ledger;
@@ -183,14 +190,20 @@ class EventIndexer {
     this.running = true;
     console.log(`Event indexer started, polling every ${this.config.pollIntervalMs}ms`);
     console.log(`Monitoring ${this.config.contracts.length} contracts`);
+    console.log(`RPC: ${this.config.rpcUrl}`);
+
+    if (this.config.contracts.length === 0) {
+      console.log('No contract IDs configured — indexer will idle. Set contract ID env vars to start indexing.');
+    }
 
     while (this.running) {
+      this.pollCount++;
       try {
         for (const contract of this.config.contracts) {
           await this.indexContract(contract);
         }
-      } catch (err) {
-        console.error('Indexing error:', err);
+      } catch (err: any) {
+        console.error('Indexing error:', err.message || err);
       }
 
       await new Promise(resolve => setTimeout(resolve, this.config.pollIntervalMs));
@@ -237,12 +250,94 @@ class EventIndexer {
       ORDER BY count DESC
     `).all();
   }
+
+  getStatus() {
+    const totalEvents = this.db.prepare('SELECT COUNT(*) as count FROM events').get() as { count: number };
+    const contractStates = this.config.contracts.map(c => ({
+      name: c.name,
+      contractId: c.contractId,
+      lastLedger: this.getLastIndexedLedger(c.contractId),
+    }));
+
+    return {
+      running: this.running,
+      rpcUrl: this.config.rpcUrl,
+      pollCount: this.pollCount,
+      totalEvents: totalEvents?.count || 0,
+      contracts: contractStates,
+      monitoredContracts: this.config.contracts.length,
+    };
+  }
+}
+
+// ─── HTTP API ────────────────────────────────────────────────────────
+
+function createApi(indexer: EventIndexer, port: number) {
+  const app = express();
+  app.use(cors());
+  app.use(express.json());
+
+  app.get('/', (_req, res) => {
+    res.json({
+      name: 'Suban Event Indexer',
+      version: '0.1.0',
+      description: 'Off-chain event indexer for Suban protocol contracts',
+      endpoints: {
+        status: '/status',
+        events: '/events',
+        eventsByContract: '/events/contract/:contractId',
+        eventsByType: '/events/type/:eventType',
+        eventsByLedger: '/events/ledger/:ledger',
+        stats: '/stats',
+      },
+    });
+  });
+
+  app.get('/status', (_req, res) => {
+    res.json(indexer.getStatus());
+  });
+
+  app.get('/events', (req, res) => {
+    const limit = parseInt(req.query.limit as string) || 100;
+    res.json({ events: indexer.getRecentEvents(Math.min(limit, 1000)) });
+  });
+
+  app.get('/events/contract/:contractId', (req, res) => {
+    const limit = parseInt(req.query.limit as string) || 100;
+    res.json({ events: indexer.getEventsByContract(req.params.contractId, Math.min(limit, 1000)) });
+  });
+
+  app.get('/events/type/:eventType', (req, res) => {
+    const limit = parseInt(req.query.limit as string) || 100;
+    res.json({ events: indexer.getEventsByType(req.params.eventType, Math.min(limit, 1000)) });
+  });
+
+  app.get('/events/ledger/:ledger', (req, res) => {
+    const ledger = parseInt(req.params.ledger);
+    if (isNaN(ledger)) {
+      res.status(400).json({ error: 'Invalid ledger number' });
+      return;
+    }
+    res.json({ events: indexer.getEventsByLedger(ledger) });
+  });
+
+  app.get('/stats', (_req, res) => {
+    res.json({ stats: indexer.getEventStats() });
+  });
+
+  app.listen(port, () => {
+    console.log(`Event indexer API listening on port ${port}`);
+  });
+
+  return app;
 }
 
 // ─── Main ────────────────────────────────────────────────────────────
 
 const config = DEFAULT_CONFIG;
 const indexer = new EventIndexer(config);
+
+createApi(indexer, config.apiPort);
 
 process.on('SIGINT', () => {
   indexer.stop();
