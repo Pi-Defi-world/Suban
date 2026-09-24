@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Escrow Viewer - Suban</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+    .nav { display: flex; justify-content: space-between; align-items: center; padding: 20px 32px; border-bottom: 1px solid #1e293b; }
+    .nav-brand { font-size: 20px; font-weight: 700; color: #3b82f6; text-decoration: none; }
+    .nav-links { display: flex; gap: 24px; }
+    .nav-links a { color: #94a3b8; text-decoration: none; font-size: 14px; transition: color 0.2s; }
+    .nav-links a:hover { color: #e2e8f0; }
+    .container { max-width: 900px; margin: 40px auto; padding: 0 24px; }
+    h1 { font-size: 28px; font-weight: 700; margin-bottom: 24px; color: #f1f5f9; }
+    .search-box { display: flex; gap: 12px; margin-bottom: 32px; }
+    .search-box input { flex: 1; padding: 12px 16px; border-radius: 8px; border: 1px solid #334155; background: #1e293b; color: #e2e8f0; font-size: 14px; outline: none; }
+    .search-box input:focus { border-color: #3b82f6; }
+    .search-box button { padding: 12px 24px; border-radius: 8px; border: none; background: #3b82f6; color: white; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .search-box button:hover { background: #2563eb; }
+    .search-box button:disabled { background: #475569; cursor: not-allowed; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+    .card h2 { font-size: 18px; font-weight: 600; margin-bottom: 16px; color: #f1f5f9; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .field { margin-bottom: 12px; }
+    .field-label { font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+    .field-value { font-size: 14px; color: #e2e8f0; font-family: monospace; word-break: break-all; }
+    .status { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; text-transform: uppercase; }
+    .status-active { background: #065f46; color: #6ee7b7; }
+    .status-completed { background: #1e3a5f; color: #7dd3fc; }
+    .status-disputed { background: #7c2d12; color: #fdba74; }
+    .status-unknown { background: #334155; color: #94a3b8; }
+    .milestone { padding: 12px 16px; border-left: 3px solid #334155; margin-bottom: 8px; background: #0f172a; border-radius: 0 8px 8px 0; }
+    .milestone.active { border-left-color: #3b82f6; }
+    .milestone.completed { border-left-color: #34d399; }
+    .milestone.disputed { border-left-color: #f59e0b; }
+    .milestone-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+    .milestone-title { font-size: 14px; font-weight: 600; color: #f1f5f9; }
+    .milestone-amount { font-size: 13px; color: #94a3b8; font-family: monospace; }
+    .event { padding: 12px 16px; border-bottom: 1px solid #1e293b; }
+    .event:last-child { border-bottom: none; }
+    .event-type { font-size: 13px; font-weight: 600; color: #3b82f6; }
+    .event-meta { font-size: 12px; color: #64748b; margin-top: 4px; }
+    .error { background: #7f1d1d; border: 1px solid #991b1b; border-radius: 8px; padding: 16px; margin-bottom: 20px; color: #fca5a5; }
+    .empty { text-align: center; padding: 40px; color: #64748b; }
+    .footer { text-align: center; padding: 40px 24px; border-top: 1px solid #1e293b; color: #64748b; font-size: 13px; margin-top: 40px; }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <a class="nav-brand" href="/">Suban</a>
+    <div class="nav-links">
+      <a href="https://horizon.suban.org">Horizon API</a>
+      <a href="https://rpc.suban.org">JSON-RPC</a>
+      <a href="https://oracle.suban.org">Oracle</a>
+      <a href="/escrow">Escrow</a>
+      <a href="https://testnet.suban.org">Testnet</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>Escrow Viewer</h1>
+
+    <div class="search-box">
+      <input type="text" id="escrowId" placeholder="Enter Escrow Contract ID (e.g., C...)" />
+      <button id="viewBtn" onclick="loadEscrow()">View</button>
+    </div>
+
+    <div id="error" class="error" style="display:none"></div>
+
+    <div id="escrow-details" style="display:none">
+      <div class="card">
+        <h2>Escrow State</h2>
+        <div class="grid">
+          <div class="field">
+            <div class="field-label">Status</div>
+            <div class="field-value" id="status"></div>
+          </div>
+          <div class="field">
+            <div class="field-label">Escrow ID</div>
+            <div class="field-value" id="escrow-id"></div>
+          </div>
+        </div>
+        <div class="grid">
+          <div class="field">
+            <div class="field-label">Funder</div>
+            <div class="field-value" id="funder"></div>
+          </div>
+          <div class="field">
+            <div class="field-label">Receiver</div>
+            <div class="field-value" id="receiver"></div>
+          </div>
+        </div>
+        <div class="grid">
+          <div class="field">
+            <div class="field-label">Total Deposited</div>
+            <div class="field-value" id="deposited"></div>
+          </div>
+          <div class="field">
+            <div class="field-label">Total Released</div>
+            <div class="field-value" id="released"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Milestones</h2>
+        <div id="milestones"></div>
+      </div>
+    </div>
+
+    <div class="card" id="events-card" style="display:none">
+      <h2>Recent Events</h2>
+      <div id="events"></div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <p>Suban Data Platform &mdash; Built for Pi Network developers</p>
+  </footer>
+
+  <script>
+    async function loadEscrow() {
+      const id = document.getElementById('escrowId').value.trim();
+      if (!id) return;
+
+      const errorEl = document.getElementById('error');
+      const detailsEl = document.getElementById('escrow-details');
+      const eventsCard = document.getElementById('events-card');
+      const viewBtn = document.getElementById('viewBtn');
+
+      errorEl.style.display = 'none';
+      detailsEl.style.display = 'none';
+      eventsCard.style.display = 'none';
+      viewBtn.disabled = true;
+      viewBtn.textContent = 'Loading...';
+
+      try {
+        // Fetch escrow state
+        const escrowRes = await fetch('/api/escrow/' + encodeURIComponent(id));
+        const escrow = await escrowRes.json();
+
+        if (escrow.error) {
+          errorEl.textContent = escrow.error + (escrow.message ? ': ' + escrow.message : '');
+          errorEl.style.display = 'block';
+          return;
+        }
+
+        detailsEl.style.display = 'block';
+        document.getElementById('escrow-id').textContent = escrow.escrowId || id;
+
+        const statusEl = document.getElementById('status');
+        statusEl.innerHTML = '<span class="status status-' + (escrow.status || 'unknown') + '">' + (escrow.status || 'unknown') + '</span>';
+
+        document.getElementById('funder').textContent = escrow.funder || 'N/A';
+        document.getElementById('receiver').textContent = escrow.receiver || 'N/A';
+        document.getElementById('deposited').textContent = escrow.totalDeposited || '0';
+        document.getElementById('released').textContent = escrow.totalReleased || '0';
+
+        // Render milestones
+        const milestonesEl = document.getElementById('milestones');
+        if (escrow.milestones && escrow.milestones.length > 0) {
+          milestonesEl.innerHTML = escrow.milestones.map((m, i) =>
+            '<div class="milestone ' + (m.status || '') + '">' +
+            '<div class="milestone-header">' +
+            '<span class="milestone-title">Milestone ' + (i + 1) + ': ' + (m.description || '') + '</span>' +
+            '<span class="milestone-amount">' + (m.amount || '0') + '</span>' +
+            '</div>' +
+            '<div class="field-label">' + (m.status || 'pending') + '</div>' +
+            '</div>'
+          ).join('');
+        } else {
+          milestonesEl.innerHTML = '<div class="empty">No milestones found</div>';
+        }
+
+        // Fetch events
+        const eventsRes = await fetch('/api/gateway/events?contract=escrow&limit=20');
+        const eventsData = await eventsRes.json();
+
+        if (eventsData.events && eventsData.events.length > 0) {
+          eventsCard.style.display = 'block';
+          document.getElementById('events').innerHTML = eventsData.events.map(e =>
+            '<div class="event">' +
+            '<div class="event-type">' + (e.event_type || 'unknown') + '</div>' +
+            '<div class="event-meta">Ledger ' + (e.ledger || '?') + ' &middot; ' + (e.tx_hash || '').substring(0, 16) + '...</div>' +
+            '</div>'
+          ).join('');
+        }
+      } catch (err) {
+        errorEl.textContent = 'Failed to load escrow data: ' + err.message;
+        errorEl.style.display = 'block';
+      } finally {
+        viewBtn.disabled = false;
+        viewBtn.textContent = 'View';
+      }
+    }
+
+    // Allow Enter key to search
+    document.getElementById('escrowId').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') loadEscrow();
+    });
+  </script>
+</body>
+</html>
