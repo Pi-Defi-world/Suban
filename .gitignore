@@ -7,3 +7,12 @@ node_modules/
 dist/
 *.db
 *.sqlite
+contracts/bridge-burn-mint/target/
+contracts/bridge-burn-mint/stellar-config/
+contracts/arc-bridge/node_modules/
+contracts/arc-bridge/artifacts/
+contracts/arc-bridge/cache/
+contracts/arc-bridge/typechain-types/
+contracts/arc-bridge/scripts/node_modules/
+contracts/arc-bridge/scripts/package-lock.json
+contracts/arc-bridge/.env
