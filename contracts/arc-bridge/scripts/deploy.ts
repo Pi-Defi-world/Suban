@@ -9,14 +9,15 @@ async function main() {
   const VOLUME_CAP = ethers.parseUnits("1000000", 6);    // 1M PUSD per window
   const VOLUME_WINDOW = 3600;                              // 1 hour
 
-  // Validator set (separate from Stellar signers)
-  // TODO: Replace with actual Arc testnet validator addresses
+  // Validator set from environment
   const VALIDATORS = [
-    "0x0000000000000000000000000000000000000001",
-    "0x0000000000000000000000000000000000000002",
-    "0x0000000000000000000000000000000000000003",
+    process.env.ARC_VALIDATOR_1 || deployer.address,
+    process.env.ARC_VALIDATOR_2 || deployer.address,
+    process.env.ARC_VALIDATOR_3 || deployer.address,
   ];
   const THRESHOLD = 2;
+
+  console.log("Validators:", VALIDATORS);
 
   // ── Deploy PUSDToken ──
   const PUSD = await ethers.getContractFactory("PUSDToken");

@@ -2,7 +2,10 @@ import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
 import * as dotenv from "dotenv";
 
-dotenv.config({ path: "../../.env" });
+// Try multiple paths for .env file
+dotenv.config({ path: "../../.env" }); // local dev
+dotenv.config({ path: "./.env" });     // docker mount
+dotenv.config();                        // default (.env in cwd)
 
 const PRIVATE_KEY = process.env.ARC_RELAYER_PRIVATE_KEY || "0x" + "0".repeat(64);
 const ARC_TESTNET_RPC = process.env.ARC_TESTNET_RPC || "https://rpc.testnet.arc.io";
