@@ -11,8 +11,6 @@ const ARC_BRIDGE_ABI = [
   "function burnPusd(string destChain, uint256 amount) external",
 ];
 
-const STELLAR_BRIDGE合约 = "bridge-burn-mint";
-
 export class TransactionBuilder {
   private stellarServer: StellarSdk.rpc.Server;
   private arcProvider: JsonRpcProvider;
@@ -84,7 +82,7 @@ export class TransactionBuilder {
     );
 
     // Build Soroban transaction
-    const account = await this.stellarServer.loadAccount(
+    const account = await this.stellarServer.getAccount(
       this.stellarKeypair.publicKey()
     );
 
@@ -119,26 +117,52 @@ export class TransactionBuilder {
 
   /**
    * Get validator signatures for a cross-chain event
-   * In production, this would call a signing service or HSM
+   * For testing: single-sig with relayer key
+   * For mainnet: implement M-of-N threshold signing
    */
   private async getValidatorSignatures(
     event: StellarBurnEvent
   ): Promise<string[]> {
-    // Placeholder: In production, this would:
-    // 1. Build the message to sign
-    // 2. Send to M-of-N validators
-    // 3. Collect signatures
-    // 4. Return array of signatures
+    // Build message to sign: destChain + amount + nonce + sourceTxHash
+    const message = ethers.solidityPacked(
+      ["string", "string", "uint256", "bytes32"],
+      [event.destinationChain, event.amount, event.nonce, event.txHash]
+    );
+    const messageHash = ethers.keccak256(message);
 
-    logger.warn("Using placeholder signatures - implement signing service");
-    return ["0x" + "0".repeat(65)]; // placeholder
+    // Sign with relayer EVM key (single-sig for testing)
+    const signingWallet = new ethers.Wallet(config.keys.evmSigner);
+    const signature = await signingWallet.signMessage(
+      ethers.getBytes(messageHash)
+    );
+
+    logger.info(`Signed cross-chain message: ${event.txHash}`);
+    return [signature];
   }
 
   /**
    * Build ScVal array of signatures for Soroban
+   * For testing: single-sig with relayer Stellar key
    */
   private buildScValSignatures(event: ArcBurnEvent): any {
-    // Placeholder: Build Soroban Vec of signer addresses
-    return StellarSdk.nativeToScVal([], { type: "vec" });
+    // Build message to sign
+    const message = `bridge:mint:${event.sourceChain}:${event.amount}:${event.nonce}:${event.txHash}`;
+    const messageBuffer = Buffer.from(message, "utf8");
+
+    // Sign with Stellar relayer key (single-sig for testing)
+    const signingKeypair = StellarSdk.Keypair.fromSecret(
+      config.keys.stellarSigner
+    );
+    const signature = signingKeypair.sign(messageBuffer);
+
+    // Return as ScVal vec of (address, signature) tuples
+    const signerScVal = new StellarSdk.Address(
+      signingKeypair.publicKey()
+    ).toScVal();
+    const sigScVal = StellarSdk.nativeToScVal(signature, { type: "bytes" });
+
+    return StellarSdk.nativeToScVal([signerScVal, sigScVal], {
+      type: "vec",
+    });
   }
 }

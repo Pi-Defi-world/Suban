@@ -17,20 +17,22 @@ export class FeeCollector {
    */
   static calculate(amount: string): FeeCalculation {
     const amountBigInt = BigInt(amount);
-    const feePercentage = BigInt(Math.floor(config.fees.percentage * 100)); // basis points
-    const protocolShare = BigInt(Math.floor(config.fees.protocolShare * 100)); // basis points
-    const minimumFee = BigInt(Math.floor(config.fees.minimumFee * 1e6)); // 6 decimals
+    // 0.5% = 50 basis points = 50/10000
+    const feeBps = BigInt(Math.round(config.fees.percentage * 100)); // 0.5 -> 50
+    const protocolShareBps = BigInt(Math.round(config.fees.protocolShare * 100)); // 0.1 -> 10
+    // Minimum fee: 1 PUSD = 1_000_000 base units (6 decimals)
+    const minimumFee = BigInt(Math.round(config.fees.minimumFee * 1_000_000));
 
-    // Calculate fee: amount * feePercentage / 10000
-    let bridgeFee = (amountBigInt * feePercentage) / 10000n;
+    // bridgeFee = amount * feeBps / 10000
+    let bridgeFee = (amountBigInt * feeBps) / 10000n;
 
     // Apply minimum fee
     if (bridgeFee < minimumFee) {
       bridgeFee = minimumFee;
     }
 
-    // Split fee between protocol and relayer
-    const protocolFee = (bridgeFee * protocolShare) / 100n;
+    // Split fee: protocol gets protocolShare portion, relayer gets rest
+    const protocolFee = (bridgeFee * protocolShareBps) / 100n;
     const relayerFee = bridgeFee - protocolFee;
 
     // Net amount after fee

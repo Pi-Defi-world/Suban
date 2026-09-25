@@ -84,7 +84,6 @@ export class StellarWatcher extends EventEmitter {
     // Get events from contract
     const events = await this.server.getEvents({
       startLedger: this.lastLedger + 1,
-      endLedger: currentLedger,
       filters: [
         {
           type: "contract",
