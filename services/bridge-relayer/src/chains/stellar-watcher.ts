@@ -107,21 +107,18 @@ export class StellarWatcher extends EventEmitter {
 
   private parseBurnEvent(event: any): StellarBurnEvent | null {
     try {
-      // Decode event topics and data
       const topics = event.topic;
       const data = event.value;
 
-      // Check if this is a burn event (topic[0] = "burn")
       if (!topics || topics.length < 2) return null;
 
       const eventType = StellarSdk.scValToNative(topics[0]);
       if (eventType !== "burn") return null;
 
-      // Parse event data
       const destination = StellarSdk.scValToNative(topics[1]);
-      const sender = StellarSdk.scValToNative(data.sender);
-      const amount = StellarSdk.scValToNative(data.amount).toString();
-      const nonce = parseInt(StellarSdk.scValToNative(data.nonce).toString());
+      const sender = topics.length > 2 ? StellarSdk.scValToNative(topics[2]) : "unknown";
+      const nonce = topics.length > 3 ? parseInt(StellarSdk.scValToNative(topics[3]).toString()) : 0;
+      const amount = StellarSdk.scValToNative(data).toString();
 
       return {
         type: "burn",
@@ -130,7 +127,9 @@ export class StellarWatcher extends EventEmitter {
         sender: sender,
         amount: amount,
         nonce: nonce,
-        txHash: event.transactionHash,
+        txHash: (event.txHash || event.transactionHash || "").startsWith("0x")
+          ? (event.txHash || event.transactionHash || "")
+          : "0x" + (event.txHash || event.transactionHash || ""),
         ledger: event.ledger,
         timestamp: Math.floor(Date.now() / 1000),
       };

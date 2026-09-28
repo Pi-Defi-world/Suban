@@ -43,8 +43,8 @@ export class TransactionBuilder {
 
     logger.info(`Building Arc mint: ${fees.netAmount} PUSD to ${recipient}`);
 
-    // Get signatures from validator set
-    const signatures = await this.getValidatorSignatures(event);
+    // Get signatures from validator set (use netAmount to match what contract receives)
+    const signatures = await this.getValidatorSignatures(event, recipient, fees.netAmount);
 
     // Build contract call
     const bridgeContract = new Contract(
@@ -121,12 +121,16 @@ export class TransactionBuilder {
    * For mainnet: implement M-of-N threshold signing
    */
   private async getValidatorSignatures(
-    event: StellarBurnEvent
+    event: StellarBurnEvent,
+    recipientAddress: string,
+    netAmount: string
   ): Promise<string[]> {
-    // Build message to sign: destChain + amount + nonce + sourceTxHash
+    // Build message to match ArcBridge's bridgeHash:
+    // keccak256(abi.encodePacked(sourceChain, sourceTxHash, sourceNonce, amount, recipient))
+    const txHashBytes = ethers.getBytes(event.txHash);
     const message = ethers.solidityPacked(
-      ["string", "string", "uint256", "bytes32"],
-      [event.destinationChain, event.amount, event.nonce, event.txHash]
+      ["string", "bytes32", "uint256", "uint256", "address"],
+      [event.sourceChain, txHashBytes, event.nonce, netAmount, recipientAddress]
     );
     const messageHash = ethers.keccak256(message);
 

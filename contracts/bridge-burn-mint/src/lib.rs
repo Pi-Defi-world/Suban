@@ -278,18 +278,23 @@ impl BridgeBurnMint {
         let burned = get_chain_burned(&env, &destination);
         set_chain_burned(&env, &destination, burned + amount);
 
-        // Burn via token contract — invoke the token's burn function
+        // Lock PUSD in bridge — transfer from sender to this contract
         let token: Address = env
             .storage()
             .instance()
             .get::<DataKey, Address>(&DataKey::PusdToken)
             .unwrap();
+        let bridge = env.current_contract_address();
 
-        // Use soroban_sdk invoke to call burn on the token contract
         env.invoke_contract::<()>(
             &token,
-            &symbol_short!("burn"),
-            soroban_sdk::vec![&env, sender.to_val(), amount.into_val(&env)],
+            &symbol_short!("transfer"),
+            soroban_sdk::vec![
+                &env,
+                sender.to_val(),
+                bridge.to_val(),
+                amount.into_val(&env),
+            ],
         );
 
         // Emit event
