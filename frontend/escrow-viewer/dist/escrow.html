@@ -193,10 +193,10 @@
     }
 
     function contractRowHtml(c) {
-      const when = c.lastActivity ? c.lastActivity.replace('T', ' ').replace('Z', ' UTC') : 'unknown time';
       return '<div class="contract-row" onclick="fillContract(\'' + c.contractId + '\')">' +
         '<span class="contract-id">' + c.contractId + '</span>' +
-        '<span class="contract-meta"><span class="pill">' + c.effectCount + ' fx</span>' + when + '</span>' +
+        '<span class="contract-meta"><span class="pill">' + c.eventCount + ' ev</span>' +
+        (c.lastLedger ? 'ledger ' + c.lastLedger : '') + '</span>' +
         '</div>';
     }
 
@@ -225,7 +225,8 @@
         headerEl.style.display = 'block';
         noteEl.textContent =
           (data.note ? data.note + ' ' : '') +
-          'Scanned ' + data.window.effectsScanned + ' effects.';
+          'Scanned ' + data.window.eventsScanned + ' Soroban events' +
+          (data.window.ledgerRange ? ' (ledgers ' + data.window.ledgerRange[0] + '-' + data.window.ledgerRange[1] + ')' : '') + '.';
         noteEl.style.display = 'block';
       } catch (err) {
         if (network !== currentNetwork) return;
@@ -260,19 +261,21 @@
           return;
         }
 
-        if (data.found && data.contract) {
-          const c = data.contract;
-          const types = Object.keys(c.effectTypes).map(function (t) {
-            return '<span class="pill">' + t + ' ' + c.effectTypes[t] + '</span>';
+        if (data.found && data.eventCount > 0) {
+          const evs = (data.events || []).slice(0, 8).map(function (e) {
+            return '<div class="event">' +
+              '<div class="event-type">Ledger ' + e.ledger + ' &middot; ' + (e.inSuccessfulContractCall ? 'success' : 'failed') + '</div>' +
+              '<div class="event-meta">' + (e.txHash || '').substring(0, 20) + '... &middot; ' + (e.topicCount || 0) + ' topics</div>' +
+              '</div>';
           }).join('');
           resultEl.innerHTML =
             '<div class="field-label" style="margin-bottom:6px">Found on ' + data.network + '</div>' +
-            '<div class="field-value" style="margin-bottom:10px">' + c.contractId + '</div>' +
+            '<div class="field-value" style="margin-bottom:10px">' + id + '</div>' +
             '<div class="grid">' +
-            '<div class="field"><div class="field-label">Effects in window</div><div class="field-value">' + c.effectCount + '</div></div>' +
-            '<div class="field"><div class="field-label">Last activity</div><div class="field-value">' + (c.lastActivity || 'unknown') + '</div></div>' +
+            '<div class="field"><div class="field-label">Events</div><div class="field-value">' + data.eventCount + '</div></div>' +
+            '<div class="field"><div class="field-label">RPC window</div><div class="field-value" style="font-size:12px">' + (data.window.ledgerRange ? data.window.ledgerRange[0] + ' - ' + data.window.ledgerRange[1] : 'n/a') + '</div></div>' +
             '</div>' +
-            '<div style="margin-top:10px">' + types + '</div>';
+            '<div style="margin-top:12px">' + evs + '</div>';
         } else {
           resultEl.innerHTML =
             '<div class="field-label" style="margin-bottom:6px">Not found on ' + data.network + '</div>' +
