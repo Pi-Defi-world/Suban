@@ -45,6 +45,22 @@
     .error { background: #7f1d1d; border: 1px solid #991b1b; border-radius: 8px; padding: 16px; margin-bottom: 20px; color: #fca5a5; }
     .empty { text-align: center; padding: 40px; color: #64748b; }
     .footer { text-align: center; padding: 40px 24px; border-top: 1px solid #1e293b; color: #64748b; font-size: 13px; margin-top: 40px; }
+    .net-toggle { display: inline-flex; background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 3px; gap: 3px; }
+    .net-toggle button { padding: 6px 16px; border: none; border-radius: 6px; background: transparent; color: #94a3b8; font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.15s, color 0.15s; }
+    .net-toggle button:hover { color: #e2e8f0; }
+    .net-toggle button.active { background: #3b82f6; color: #ffffff; }
+    .net-badge { display: inline-block; padding: 3px 9px; border-radius: 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-left: 10px; vertical-align: middle; }
+    .net-badge-mainnet { background: #1e3a5f; color: #7dd3fc; }
+    .net-badge-testnet { background: #4c1d95; color: #c4b5fd; }
+    .net-hint { font-size: 12px; color: #64748b; margin-bottom: 24px; }
+    .contract-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #1e293b; cursor: pointer; }
+    .contract-row:last-child { border-bottom: none; }
+    .contract-row:hover { background: #0f172a; }
+    .contract-id { font-family: monospace; font-size: 13px; color: #7dd3fc; word-break: break-all; }
+    .contract-meta { font-size: 12px; color: #64748b; white-space: nowrap; }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; background: #1e3a5f; color: #7dd3fc; margin-right: 8px; }
+    .note { font-size: 12px; color: #64748b; margin-top: 12px; }
+    code.mono { font-family: monospace; background: #0f172a; padding: 2px 6px; border-radius: 4px; color: #7dd3fc; }
   </style>
 </head>
 <body>
@@ -60,7 +76,15 @@
   </nav>
 
   <div class="container">
-    <h1>Escrow Viewer</h1>
+    <h1>Escrow Viewer <span id="net-badge" class="net-badge net-badge-mainnet">Mainnet</span></h1>
+
+    <div style="margin-bottom:20px">
+      <div class="net-toggle" role="group" aria-label="Select network">
+        <button id="btn-mainnet" class="active" onclick="setNetwork('mainnet')">Mainnet</button>
+        <button id="btn-testnet" onclick="setNetwork('testnet')">Testnet</button>
+      </div>
+      <div class="net-hint" id="net-hint">Querying the Pi Network mainnet Horizon.</div>
+    </div>
 
     <div class="search-box">
       <input type="text" id="escrowId" placeholder="Enter Escrow Contract ID (e.g., C...)" />
@@ -69,9 +93,23 @@
 
     <div id="error" class="error" style="display:none"></div>
 
+    <div class="card">
+      <h2>Contract Search</h2>
+      <div class="search-box" style="margin-bottom:16px">
+        <input type="text" id="contractId" placeholder="Search any contract ID (C...)" />
+        <button id="contractSearchBtn" onclick="searchContract()">Search</button>
+      </div>
+      <div id="contract-result" style="display:none"></div>
+      <div id="contract-list-header" style="display:none;margin-bottom:8px">
+        <div class="field-label">Contracts with recent activity</div>
+      </div>
+      <div id="contract-list"></div>
+      <div class="note" id="contract-note" style="display:none"></div>
+    </div>
+
     <div id="escrow-details" style="display:none">
-      <div class="card">
-        <h2>Escrow State</h2>
+    <div class="card">
+      <h2>Escrow State</h2>
         <div class="grid">
           <div class="field">
             <div class="field-label">Status</div>
@@ -121,10 +159,147 @@
   </footer>
 
   <script>
+    const NETWORKS = {
+      mainnet: { label: 'Mainnet', hint: 'Querying the Pi Network mainnet Horizon.' },
+      testnet: { label: 'Testnet', hint: 'Querying the Pi Network testnet Horizon.' },
+    };
+
+    let currentNetwork = 'mainnet';
+
+    function setNetwork(network) {
+      if (!NETWORKS[network]) return;
+      currentNetwork = network;
+
+      document.getElementById('btn-mainnet').classList.toggle('active', network === 'mainnet');
+      document.getElementById('btn-testnet').classList.toggle('active', network === 'testnet');
+
+      const badge = document.getElementById('net-badge');
+      badge.textContent = NETWORKS[network].label;
+      badge.className = 'net-badge net-badge-' + network;
+
+      document.getElementById('net-hint').textContent = NETWORKS[network].hint;
+
+      // Clear stale results so nothing from the previous network is misread as current.
+      document.getElementById('escrow-details').style.display = 'none';
+      document.getElementById('events-card').style.display = 'none';
+      document.getElementById('error').style.display = 'none';
+      document.getElementById('contract-result').style.display = 'none';
+
+      // Contract activity is network-specific, so reload it too.
+      loadContracts();
+
+      // Re-query only if the user already entered a contract.
+      if (document.getElementById('escrowId').value.trim()) loadEscrow();
+    }
+
+    function contractRowHtml(c) {
+      const when = c.lastActivity ? c.lastActivity.replace('T', ' ').replace('Z', ' UTC') : 'unknown time';
+      return '<div class="contract-row" onclick="fillContract(\'' + c.contractId + '\')">' +
+        '<span class="contract-id">' + c.contractId + '</span>' +
+        '<span class="contract-meta"><span class="pill">' + c.effectCount + ' fx</span>' + when + '</span>' +
+        '</div>';
+    }
+
+    async function loadContracts() {
+      const network = currentNetwork;
+      const listEl = document.getElementById('contract-list');
+      const headerEl = document.getElementById('contract-list-header');
+      const noteEl = document.getElementById('contract-note');
+
+      listEl.innerHTML = '<div class="empty">Loading contracts...</div>';
+
+      try {
+        const res = await fetch('/api/contracts?network=' + network);
+        const data = await res.json();
+        if (network !== currentNetwork) return;
+
+        if (!data.contracts || data.contracts.length === 0) {
+          listEl.innerHTML = '<div class="empty">No contract activity found in the scanned window.</div>';
+          headerEl.style.display = 'none';
+          noteEl.textContent = data.note || '';
+          noteEl.style.display = 'block';
+          return;
+        }
+
+        listEl.innerHTML = data.contracts.map(contractRowHtml).join('');
+        headerEl.style.display = 'block';
+        noteEl.textContent =
+          (data.note ? data.note + ' ' : '') +
+          'Scanned ' + data.window.effectsScanned + ' effects.';
+        noteEl.style.display = 'block';
+      } catch (err) {
+        if (network !== currentNetwork) return;
+        listEl.innerHTML = '<div class="empty">Failed to load contracts: ' + err.message + '</div>';
+      }
+    }
+
+    function fillContract(id) {
+      document.getElementById('contractId').value = id;
+      searchContract();
+    }
+
+    async function searchContract() {
+      const id = document.getElementById('contractId').value.trim().toUpperCase();
+      const resultEl = document.getElementById('contract-result');
+      const btn = document.getElementById('contractSearchBtn');
+
+      if (!id) return;
+
+      const network = currentNetwork;
+      btn.disabled = true;
+      btn.textContent = 'Searching...';
+
+      try {
+        const res = await fetch('/api/contracts/' + encodeURIComponent(id) + '?network=' + network);
+        const data = await res.json();
+        if (network !== currentNetwork) return;
+
+        if (data.error) {
+          resultEl.innerHTML = '<div class="error">' + data.error + (data.message ? ': ' + data.message : '') + '</div>';
+          resultEl.style.display = 'block';
+          return;
+        }
+
+        if (data.found && data.contract) {
+          const c = data.contract;
+          const types = Object.keys(c.effectTypes).map(function (t) {
+            return '<span class="pill">' + t + ' ' + c.effectTypes[t] + '</span>';
+          }).join('');
+          resultEl.innerHTML =
+            '<div class="field-label" style="margin-bottom:6px">Found on ' + data.network + '</div>' +
+            '<div class="field-value" style="margin-bottom:10px">' + c.contractId + '</div>' +
+            '<div class="grid">' +
+            '<div class="field"><div class="field-label">Effects in window</div><div class="field-value">' + c.effectCount + '</div></div>' +
+            '<div class="field"><div class="field-label">Last activity</div><div class="field-value">' + (c.lastActivity || 'unknown') + '</div></div>' +
+            '</div>' +
+            '<div style="margin-top:10px">' + types + '</div>';
+        } else {
+          resultEl.innerHTML =
+            '<div class="field-label" style="margin-bottom:6px">Not found on ' + data.network + '</div>' +
+            '<div class="note">' + (data.note || '') + '</div>';
+        }
+        resultEl.style.display = 'block';
+      } catch (err) {
+        resultEl.innerHTML = '<div class="error">Search failed: ' + err.message + '</div>';
+        resultEl.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Search';
+      }
+    }
+
+    document.getElementById('contractId').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') searchContract();
+    });
+
+    // Initial contract listing for the default network.
+    loadContracts();
+
     async function loadEscrow() {
       const id = document.getElementById('escrowId').value.trim();
       if (!id) return;
 
+      const network = currentNetwork;
       const errorEl = document.getElementById('error');
       const detailsEl = document.getElementById('escrow-details');
       const eventsCard = document.getElementById('events-card');
@@ -138,8 +313,11 @@
 
       try {
         // Fetch escrow state
-        const escrowRes = await fetch('/api/escrow/' + encodeURIComponent(id));
+        const escrowRes = await fetch('/api/escrow/' + encodeURIComponent(id) + '?network=' + network);
         const escrow = await escrowRes.json();
+
+        // Discard the response if the user switched networks while it was in flight.
+        if (network !== currentNetwork) return;
 
         if (escrow.error) {
           errorEl.textContent = escrow.error + (escrow.message ? ': ' + escrow.message : '');
@@ -175,8 +353,10 @@
         }
 
         // Fetch events
-        const eventsRes = await fetch('/api/gateway/events?contract=escrow&limit=20');
+        const eventsRes = await fetch('/api/gateway/events?contract=escrow&limit=20&network=' + network);
         const eventsData = await eventsRes.json();
+
+        if (network !== currentNetwork) return;
 
         if (eventsData.events && eventsData.events.length > 0) {
           eventsCard.style.display = 'block';
