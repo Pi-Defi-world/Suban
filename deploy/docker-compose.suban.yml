@@ -1,3 +1,5 @@
+name: docker
+
 # Suban Data Platform
 # Runs Suban services connecting to existing pi-mainnet node
 #

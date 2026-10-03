@@ -1,3 +1,5 @@
+name: docker
+
 # Pi Testnet Node
 # Horizon API: http://localhost:42401 | Peer: 42402 | RPC: 42403
 #

@@ -1,3 +1,5 @@
+name: docker
+
 # Pi Mainnet Node — runs alongside the existing testnet2 node
 # Mainnet Horizon API: port 41401 | Peer: 41402 | RPC: 41403
 services:
