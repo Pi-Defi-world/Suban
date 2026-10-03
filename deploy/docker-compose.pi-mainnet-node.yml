@@ -1,18 +1,25 @@
 name: docker
 
-# Pi Mainnet Node — runs alongside the existing testnet2 node
-# Mainnet Horizon API: port 41401 | Peer: 41402 | RPC: 41403
+# Pi Mainnet Node
+# Horizon API: port 41401 | Peer: 41402 | RPC: 41403
+#
+# The stock image ships Horizon with autostart=false and relies on its own
+# entrypoint to start it after catchup. The entrypoint wrapper stages configs
+# and runs a watchdog so Horizon survives a container restart.
 services:
   pi-mainnet:
     image: pinetwork/pi-node-docker:community-v1.0-p28.0.1
     container_name: pi-mainnet
-    restart: on-failure
+    restart: unless-stopped
+    entrypoint: ["/bin/bash", "/etc/suban/entrypoint.sh"]
     ports:
       - "41401:8000"
       - "41402:31402"
       - "41403:8003"
     volumes:
       - "pi-mainnet-data:/opt/stellar"
+      - "./pi-entrypoint.sh:/etc/suban/entrypoint.sh:ro"
+      - "./pi-testnet-horizon-ensure.sh:/etc/suban/horizon-ensure.sh:ro"
     environment:
       - POSTGRES_PASSWORD=pi-mainnet-pg
     command: ["--mainnet"]

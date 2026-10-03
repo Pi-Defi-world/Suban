@@ -1,11 +1,12 @@
 name: docker
 
 # Pi Testnet Node
-# Horizon API: http://localhost:42401 | Peer: 42402 | RPC: 42403
+# Horizon API: port 42401 | Peer: 42402 | RPC: 42403
 #
-# The stock image's `--testnet2` flag hardcodes a stale validator set and an
-# abandoned history archive, and ships Horizon with autostart=false. The
-# entrypoint wrapper stages corrected configs before handing off to /start.
+# The stock `--testnet2` flag hardcodes a stale validator set (GDFDD/GDOJP/GAOBN,
+# which sit on a different fork at ledger ~11.1M) and the abandoned
+# history.testnet2.minepi.com archive. The entrypoint wrapper stages the
+# corrected config and runs a Horizon watchdog.
 services:
   pi-testnet:
     image: pinetwork/pi-node-docker:community-v1.0-p28.0.1
@@ -18,7 +19,7 @@ services:
       - "42403:8003"
     volumes:
       - "pi-testnet-data:/opt/stellar"
-      - "./pi-testnet-entrypoint.sh:/etc/suban/entrypoint.sh:ro"
+      - "./pi-entrypoint.sh:/etc/suban/entrypoint.sh:ro"
       - "./pi-testnet-core.cfg:/etc/suban/pi-testnet-core.cfg:ro"
       - "./pi-testnet-horizon-core.yml:/etc/suban/pi-testnet-horizon-core.yml:ro"
       - "./pi-testnet-horizon.env:/etc/suban/pi-testnet-horizon.env:ro"
