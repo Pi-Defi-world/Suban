@@ -1,0 +1,72 @@
+{
+	auto_https off
+}
+
+:80 {
+	@horizon host horizon.suban.org
+	@rpc host rpc.suban.org
+	@testnet host testnet.suban.org
+	@testrpc host testrpc.suban.org
+	@oracle host oracle.suban.org
+	@main host suban.org
+	@www host www.suban.org
+
+	handle @horizon {
+		reverse_proxy suban-api:4000
+	}
+
+	# Arc chain endpoints are served on horizon subdomain via /arc/*
+	# Also accessible directly via suban-api default route
+
+	handle @rpc {
+		reverse_proxy suban-rpc:8000
+	}
+
+	handle @testnet {
+		reverse_proxy pi-testnet:8000
+	}
+
+	handle @testrpc {
+		reverse_proxy stellar-rpc-testnet:8000
+	}
+
+	handle @oracle {
+		reverse_proxy suban-controller:3000
+	}
+
+	handle @main {
+		# API calls for escrow viewer go to suban-controller
+		@escrowApi path /api/escrow/* /api/gateway/* /api/contracts*
+		handle @escrowApi {
+			reverse_proxy suban-controller:3000
+		}
+		# Escrow viewer page
+		@escrowPage path /escrow
+		handle @escrowPage {
+			rewrite * /escrow.html
+			root * /srv/suban
+			file_server
+		}
+		# Everything else is static files
+		root * /srv/suban
+		file_server
+	}
+
+	handle @www {
+		@escrowApi path /api/escrow/* /api/gateway/* /api/contracts*
+		handle @escrowApi {
+			reverse_proxy suban-controller:3000
+		}
+		@escrowPage path /escrow
+		handle @escrowPage {
+			rewrite * /escrow.html
+			root * /srv/suban
+			file_server
+		}
+		root * /srv/suban
+		file_server
+	}
+
+	# Default: Suban API
+	reverse_proxy suban-api:4000
+}

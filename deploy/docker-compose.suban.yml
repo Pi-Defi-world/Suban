@@ -1,0 +1,235 @@
+# Suban Data Platform
+# Runs Suban services connecting to existing pi-mainnet node
+#
+# Architecture:
+#   Internet → Cloudflare → Cloudflared → Caddy → Suban Services → Pi Nodes
+#
+# Prerequisites:
+#   docker compose -f docker-compose.pi-mainnet-node.yml up -d
+#
+# Usage:
+#   docker compose -f docker-compose.suban.yml up -d --build
+#
+# Subdomains:
+#   rpc.suban.org      → Mainnet JSON-RPC (suban-rpc)
+#   testnet.suban.org  → Testnet Horizon API (testnet2)
+#   oracle.suban.org   → Price oracle + on-chain analytics
+#   testrpc.suban.org  → Testnet JSON-RPC (official stellar-rpc-testnet)
+#   horizon.suban.org  → Mainnet Horizon API
+
+services:
+  # ======================================================================
+  # SUBAN RPC - JSON-RPC for Pi Network smart contracts
+  # ======================================================================
+  suban-rpc:
+    build:
+      context: ../../suban-rpc
+      dockerfile: Dockerfile
+    container_name: suban-rpc
+    restart: on-failure
+    expose:
+      - "8000"
+      - "8001"
+    environment:
+      - PI_RPC_CONFIG_PATH=/config/suban-rpc.toml
+    volumes:
+      - suban-rpc-data:/data
+      - suban-rpc-captive-core:/captive-core
+      - ./suban-rpc-mainnet.toml:/config/suban-rpc.toml:ro
+      - ../../suban-rpc/suban-core.cfg:/app/suban-core.cfg:ro
+    networks:
+      - suban-net
+
+  # ======================================================================
+  # SUBAN RPC TESTNET - JSON-RPC for Pi Testnet smart contracts
+  # ======================================================================
+  suban-rpc-testnet:
+    build:
+      context: ../../suban-rpc
+      dockerfile: Dockerfile
+    container_name: suban-rpc-testnet
+    restart: on-failure
+    expose:
+      - "8000"
+      - "8001"
+    environment:
+      - PI_RPC_CONFIG_PATH=/config/suban-rpc.toml
+    volumes:
+      - suban-rpc-testnet-data:/data
+      - suban-rpc-testnet-captive-core:/captive-core
+      - ./suban-rpc-testnet.toml:/config/suban-rpc.toml:ro
+      - ./suban-core-testnet.cfg:/app/suban-core-testnet.cfg:ro
+    networks:
+      - suban-net
+
+  # ======================================================================
+  # STELLAR RPC TESTNET - Standard Soroban RPC for Pi Testnet
+  # ======================================================================
+  stellar-rpc-testnet:
+    image: stellar/stellar-rpc:latest
+    container_name: stellar-rpc-testnet
+    restart: on-failure
+    command: --captive-core-config-path /config/captive-core.cfg
+    expose:
+      - "8000"
+    environment:
+      - ENDPOINT=0.0.0.0:8000
+      - NETWORK_PASSPHRASE=Pi Testnet
+      - HISTORY_ARCHIVE_URLS=https://history.testnet.minepi.com/
+      - CHECKPOINT_FREQUENCY=64
+      - DB_PATH=/data/stellar-rpc-testnet.sqlite
+      - LOG_LEVEL=info
+    volumes:
+      - stellar-rpc-testnet-data:/data
+      - ./stellar-captive-core-testnet.cfg:/config/captive-core.cfg:ro
+    networks:
+      - suban-net
+
+  # ======================================================================
+  # SUBAN API - Horizon wrapper with caching + rate limiting
+  # ======================================================================
+  suban-api:
+    build:
+      context: ../../Suban-api
+      dockerfile: Dockerfile
+    container_name: suban-api
+    restart: on-failure
+    environment:
+      - PORT=4000
+      - NODE_ENV=production
+      - HORIZON_URL=http://pi-mainnet:8000
+      - NETWORK=mainnet
+      - RATE_LIMIT_WINDOW_MS=60000
+      - RATE_LIMIT_MAX_REQUESTS=5000
+      - CACHE_TTL_SECONDS=5
+      - LOG_LEVEL=info
+      - ARC_RPC_URL=${ARC_RPC_URL:-}
+      - ARC_CHAIN_ID=${ARC_CHAIN_ID:-0}
+      - ARC_NETWORK_NAME=${ARC_NETWORK_NAME:-Arc}
+    networks:
+      - suban-net
+
+  # ======================================================================
+  # SUBAN CONTROLLER - Data oracle (price feeds + on-chain analytics)
+  # ======================================================================
+  suban-controller:
+    build:
+      context: ../../suban-controller
+      dockerfile: Dockerfile
+    container_name: suban-controller
+    restart: on-failure
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - NETWORK=mainnet
+      - HORIZON_MAINNET_URL=http://pi-mainnet:8000
+      - HORIZON_TESTNET_URL=http://pi-testnet:8000
+      - CACHE_TTL_SECONDS=10
+      - CHAIN_DATA_CACHE_TTL=30
+      - OUTLIER_THRESHOLD_PERCENT=10
+      - MIN_SOURCES_REQUIRED=1
+      - PI_SYMBOL_COINGECKO=pi-network
+      - PI_SYMBOL_OKX=PI-USDT
+      - PI_SYMBOL_BITGET=PIUSDT
+      - WEIGHT_COINGECKO=1.5
+      - WEIGHT_OKX=2.0
+      - WEIGHT_BITGET=2.0
+      - TX_STREAM_POLL_MS=5000
+      - TX_STREAM_BUFFER_SIZE=100
+      - LOG_LEVEL=info
+      - ARC_RPC_URL=${ARC_RPC_URL:-}
+      - ARC_PRICE_PAIR_ADDRESS=${ARC_PRICE_PAIR_ADDRESS:-}
+      - WEIGHT_ARC=${WEIGHT_ARC:-1.5}
+      - SOROBAN_RPC_MAINNET_URL=https://rpc.suban.org
+      - SOROBAN_RPC_TESTNET_URL=https://rpc.testnet.minepi.com
+      - CONTRACT_RPC_MAINNET_URL=http://suban-rpc:8000
+      - CONTRACT_RPC_TESTNET_URL=http://stellar-rpc-testnet:8000
+    networks:
+      - suban-net
+
+  # ======================================================================
+  # EVENT INDEXER - Off-chain contract event indexer (SQLite + HTTP API)
+  # ======================================================================
+  event-indexer:
+    build:
+      context: ../services/event-indexer
+      dockerfile: Dockerfile
+    container_name: suban-event-indexer
+    restart: on-failure
+    expose:
+      - "3002"
+    environment:
+      - PI_SOROBAN_RPC_URL=http://suban-rpc:8000
+      - PI_NETWORK_PASSPHRASE=Pi Network
+      - INDEXER_DB_PATH=/data/events.db
+      - INDEXER_POLL_MS=10000
+      - INDEXER_API_PORT=3002
+    volumes:
+      - event-indexer-data:/data
+    networks:
+      - suban-net
+
+  # ======================================================================
+  # BRIDGE RELAYER - Cross-chain PUSD bridge relayer (Stellar ↔ Arc)
+  # ======================================================================
+  bridge-relayer:
+    build:
+      context: ../services/bridge-relayer
+      dockerfile: docker/Dockerfile
+    container_name: suban-bridge-relayer
+    restart: on-failure
+    env_file:
+      - ./.env.relayer
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-debug}
+    networks:
+      - suban-net
+
+  # ======================================================================
+  # CADDY - Internal reverse proxy + static frontend
+  # ======================================================================
+  caddy:
+    image: caddy:2-alpine
+    container_name: suban-caddy
+    restart: unless-stopped
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../frontend/escrow-viewer/dist:/srv/suban:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - suban-api
+      - suban-controller
+      - suban-rpc
+    networks:
+      - suban-net
+
+  # ======================================================================
+  # CLOUDFLARED - Cloudflare tunnel
+  # ======================================================================
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: suban-cloudflared
+    restart: unless-stopped
+    command: tunnel run --token ${TUNNEL_TOKEN}
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
+    depends_on:
+      - caddy
+    networks:
+      - suban-net
+
+volumes:
+  caddy_data:
+  caddy_config:
+  suban-rpc-data:
+  suban-rpc-captive-core:
+  suban-rpc-testnet-data:
+  suban-rpc-testnet-captive-core:
+  stellar-rpc-testnet-data:
+  event-indexer-data:
+
+networks:
+  suban-net:
+    external: true
+    name: docker_default

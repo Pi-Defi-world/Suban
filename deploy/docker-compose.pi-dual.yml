@@ -1,0 +1,58 @@
+# Pi Horizon Dual-Instance: Mainnet (port 41401) + Testnet (port 31401)
+# Uses Pi Node Docker image which includes stellar-core + Horizon + PostgreSQL + RPC
+# Usage: docker compose -f docker-compose.pi-dual.yml up -d
+#
+# IMPORTANT: After containers start, core syncs first. Once synced, run:
+#   docker exec pi-mainnet supervisorctl start horizon rpc
+#   docker exec pi-testnet supervisorctl start horizon rpc
+#
+# This is because Pi Node supervisor sets autostart=false for horizon/rpc.
+
+version: '3'
+services:
+
+  # ======================================================================
+  # MAINNET — Pi Network (port 41401)
+  # Horizon API: http://localhost:41401
+  # Stellar Core: http://localhost:41402
+  # RPC: http://localhost:41403
+  # ======================================================================
+
+  pi-mainnet:
+    image: pinetwork/pi-node-docker:community-v1.0-p27.1.0
+    container_name: pi-mainnet
+    restart: on-failure
+    ports:
+      - "41401:8000"
+      - "41402:31402"
+      - "41403:8003"
+    volumes:
+      - "pi-mainnet-data:/opt/stellar"
+    environment:
+      - POSTGRES_PASSWORD=pi-mainnet-pg
+    command: ["--mainnet"]
+
+  # ======================================================================
+  # TESTNET — Pi Testnet2 (port 31401)
+  # Horizon API: http://localhost:31401
+  # Stellar Core: http://localhost:31402
+  # RPC: http://localhost:31403
+  # ======================================================================
+
+  pi-testnet:
+    image: pinetwork/pi-node-docker:community-v1.0-p27.1.0
+    container_name: pi-testnet
+    restart: on-failure
+    ports:
+      - "31401:8000"
+      - "31402:31402"
+      - "31403:8003"
+    volumes:
+      - "pi-testnet-data:/opt/stellar"
+    environment:
+      - POSTGRES_PASSWORD=pi-testnet-pg
+    command: ["--testnet2"]
+
+volumes:
+  pi-mainnet-data:
+  pi-testnet-data:

@@ -1,0 +1,40 @@
+# Minimal Horizon-only compose — no standalone stellar-core needed.
+# Captive core runs inside the Horizon container.
+# Uses host networking so captive core can reach Pi validators via UDP overlay.
+services:
+  horizon-postgres:
+    platform: linux/amd64
+    image: postgres:16-bookworm
+    restart: on-failure
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
+      POSTGRES_DB: horizon
+    ports:
+      - "5432:5432"
+    volumes:
+      - horizon-db-data:/var/lib/postgresql/data
+
+  horizon:
+    platform: linux/amd64
+    depends_on:
+      - horizon-postgres
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.dev
+      args:
+        STELLAR_CORE_VERSION: "27*"
+    restart: on-failure
+    network_mode: host
+    volumes:
+      - ./captive-core-mainnet.cfg:/captive-core-mainnet.cfg:ro
+    environment:
+      - NETWORK=pimainnet
+      - DATABASE_URL=postgres://postgres@localhost:5432/horizon?sslmode=disable
+      - CAPTIVE_CORE_CONFIG_PATH=/captive-core-mainnet.cfg
+      - INGEST=true
+      - DISABLE_TX_SUB=true
+      - PER_HOUR_RATE_LIMIT=0
+    command: ["--apply-migrations"]
+
+volumes:
+  horizon-db-data:

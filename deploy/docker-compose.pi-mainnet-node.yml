@@ -1,0 +1,19 @@
+# Pi Mainnet Node — runs alongside the existing testnet2 node
+# Mainnet Horizon API: port 41401 | Peer: 41402 | RPC: 41403
+services:
+  pi-mainnet:
+    image: pinetwork/pi-node-docker:community-v1.0-p28.0.1
+    container_name: pi-mainnet
+    restart: on-failure
+    ports:
+      - "41401:8000"
+      - "41402:31402"
+      - "41403:8003"
+    volumes:
+      - "pi-mainnet-data:/opt/stellar"
+    environment:
+      - POSTGRES_PASSWORD=pi-mainnet-pg
+    command: ["--mainnet"]
+
+volumes:
+  pi-mainnet-data:

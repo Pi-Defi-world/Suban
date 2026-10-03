@@ -1,0 +1,23 @@
+# stellar-core only (for Pi testnet / custom cfg in docker-compose.pi-full.yml)
+FROM ubuntu:24.04
+
+ARG STELLAR_CORE_VERSION
+ENV STELLAR_CORE_VERSION=${STELLAR_CORE_VERSION:-*}
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl wget gnupg apt-utils bash \
+    && mkdir -p /etc/apt/keyrings && wget -qO - https://apt.stellar.org/SDF.asc | gpg --dearmor -o /etc/apt/keyrings/SDF.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/SDF.gpg] https://apt.stellar.org noble stable" >/etc/apt/sources.list.d/SDF.list \
+    && echo "deb [signed-by=/etc/apt/keyrings/SDF.gpg] https://apt.stellar.org noble unstable" >/etc/apt/sources.list.d/SDF-unstable.list \
+    && apt-get update && apt-get install -y stellar-core=${STELLAR_CORE_VERSION} \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p /opt/stellar/core/buckets /opt/stellar/history/local
+
+COPY docker/pi-core-entry.sh /usr/local/bin/pi-core-entry.sh
+RUN chmod +x /usr/local/bin/pi-core-entry.sh
+
+WORKDIR /opt/stellar/core
+EXPOSE 11626 31402
+
+ENTRYPOINT ["/usr/local/bin/pi-core-entry.sh"]

@@ -1,0 +1,62 @@
+version: '3'
+services:
+  # ------------------------------------------------------------------
+  # Horizon's own PostgreSQL (stores ingested ledger data)
+  # ------------------------------------------------------------------
+  horizon-postgres:
+    platform: linux/amd64
+    image: postgres:16-bookworm
+    restart: on-failure
+    environment:
+      - POSTGRES_HOST_AUTH_METHOD=trust
+      - POSTGRES_DB=horizon
+    expose:
+      - "5432"
+    volumes:
+      - "horizon-db-data:/var/lib/postgresql/data"
+
+  # ------------------------------------------------------------------
+  # Horizon API server - ingest mode, tx submission disabled
+  # ------------------------------------------------------------------
+  horizon:
+    platform: linux/amd64
+    depends_on:
+      - horizon-postgres
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.dev
+    restart: on-failure
+    ports:
+      - "8000:8000"
+    environment:
+      # === Pi Network identity ===
+      - NETWORK=pitestnet
+      # Or set passphrase + history archives manually instead of NETWORK:
+      # - NETWORK_PASSPHRASE=Pi Testnet
+      # - HISTORY_ARCHIVE_URLS=https://history.testnet.minepi.com/  # <-- update this
+
+      # === Database ===
+      - DATABASE_URL=postgres://postgres@horizon-postgres:5432/horizon?sslmode=disable
+
+      # === Pi Node (stellar-core) connection ===
+      - STELLAR_CORE_URL=http://testnet2:11626
+
+      # === Ingest (read-only, no tx submission) ===
+      - INGEST=true
+      - DISABLE_TX_SUB=true
+
+      # === Rate limit disabled for local use ===
+      - PER_HOUR_RATE_LIMIT=0
+
+    command: ["--apply-migrations"]
+    networks:
+      - default
+      - pi-network
+
+networks:
+  pi-network:
+    external: true
+    name: pi-network_default
+
+volumes:
+  horizon-db-data:

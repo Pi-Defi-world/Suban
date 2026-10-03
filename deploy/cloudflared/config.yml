@@ -1,0 +1,43 @@
+# Cloudflared Tunnel Configuration
+# For exposing Suban services via Cloudflare tunnel
+#
+# NOTE: When using TUNNEL_TOKEN, this file is optional.
+# The token-based config is managed via Cloudflare dashboard.
+# This file is provided as reference for the ingress rules.
+
+tunnel: <YOUR_TUNNEL_ID>
+credentials-file: /etc/cloudflared/credentials.json
+
+ingress:
+  # Mainnet JSON-RPC
+  - hostname: rpc.suban.org
+    service: http://suban-caddy:80
+    originRequest:
+      noTLSVerify: true
+
+  # Testnet Horizon API
+  - hostname: testnet.suban.org
+    service: http://suban-caddy:80
+    originRequest:
+      noTLSVerify: true
+
+  # Oracle (price feeds + analytics)
+  - hostname: oracle.suban.org
+    service: http://suban-caddy:80
+    originRequest:
+      noTLSVerify: true
+
+  # Testnet JSON-RPC
+  - hostname: testrpc.suban.org
+    service: http://suban-caddy:80
+    originRequest:
+      noTLSVerify: true
+
+  # Mainnet Horizon API
+  - hostname: horizon.suban.org
+    service: http://suban-caddy:80
+    originRequest:
+      noTLSVerify: true
+
+  # Catch-all
+  - service: http_status:404
