@@ -782,7 +782,7 @@ mod test {
         let signers = vec![&s.env, s.signers.get(0).unwrap(), s.signers.get(1).unwrap()];
 
         // Clear the blanket mock from setup: no auth entries are attached now.
-        s.env.set_auths(&[] as &[MockAuth]);
+        s.env.mock_auths(&[] as &[MockAuth]);
 
         let result = s.client.try_mint_pusd(
             &recipient,
@@ -824,7 +824,7 @@ mod test {
         let s = setup(1);
         let sender = Address::generate(&s.env);
 
-        s.env.set_auths(&[] as &[MockAuth]);
+        s.env.mock_auths(&[] as &[MockAuth]);
 
         let result = s.client.try_burn_pusd(
             &sender,

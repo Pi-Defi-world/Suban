@@ -370,6 +370,23 @@ This plan is sequenced by **risk removal first, then data, then financial produc
 
 **Exit criterion:** no known critical defect; CI green; no secrets in the tree.
 
+#### Phase 0 — progress log (19 Oct 2026)
+
+Status: ✅ done and verified · 🟡 done, pending CI/owner action · ⬜ not started
+
+| # | Task | Status | What changed / what is left |
+|---|---|---|---|
+| 0.1 | Freeze bridge/mainnet capital work | ⬜ | Process decision, not a code change. |
+| 0.2 | Fix or disable oracle push | ✅ | `suban-controller/src/services/oracle-push.ts` now uses the Soroban `rpc.Server` (build → prepare → sign → send → poll) and passes all five `set_price` args (`admin, asset, price, decimals, confidence`). The broken zero-arg call is gone. Publishing is opt-in (`ORACLE_PUSH_ENABLED=false` by default) and needs `ORACLE_ASSET`. An on-chain integration test is still pending. |
+| 0.3 | Fix bridge mint verification | ✅ | `contracts/bridge-burn-mint`: `mint_pusd` no longer trusts a caller-supplied signature list. Every listed signer must be a configured signer, must be unique, and must `require_auth()` (the cryptographic proof). 8 unit tests cover threshold, non-signer, duplicate, replay and missing-authorization. The Arc→Stellar relayer path is explicitly disabled until signer auth entries are implemented. |
+| 0.4 | Rotate leaked secrets | 🟡 | Committed keys are removed from the working tree (`docs/PROJECT-REPORT.md`, deploy core configs, `fund-deployer.*` now read `FAUCET_SECRET` from env). gitleaks is in CI. **Owner action still required:** rotate the Stellar deployer, PUSD admin, Arc relayer keys and the Cloudflare tunnel token, then purge git history. |
+| 0.5 | Protect controller control routes | ✅ | `POST /price/commit` and `POST /circuit-breaker/reset` now require `CONTROLLER_ADMIN_API_KEY` (constant-time compare; 503 if unset) and are rate-limited per IP. 6 unit tests. |
+| 0.6 | Bring `bridge-burn-mint` into workspace | ✅ | Added to the root `Cargo.toml` members, `soroban-sdk 27` workspace dependency, nested lock removed. Verified with `cargo test -p bridge-burn-mint` in a Rust container. |
+| 0.7 | Add CI to all four repos | 🟡 | GitHub Actions added to all four repos (Rust workspace, TS typecheck/tests, Go build, pnpm, gitleaks). Pending the first green run on GitHub. |
+| 0.8 | Secret scanning and dependency audit | 🟡 | gitleaks in all four repos: working-tree scan is blocking, history scan is report-only. Verified clean on fresh checkouts. Dependency audit (`npm audit` / `cargo audit`) not yet wired. |
+
+**New defect found while adding CI (P1):** `suban-rpc` has two committed build artifacts, `pi-rpc` (~98 MB) and `db.test` (~59 MB), which bloat every clone and CI checkout. Remove them from git, add to `.gitignore`, and rewrite history (bundle with the D3 history purge).
+
 ---
 
 ### Phase 1 — Consolidate L0/L2 (Week 3–5)

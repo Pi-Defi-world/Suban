@@ -3,19 +3,30 @@ title = "Suban secret scanning"
 [extend]
 useDefault = true
 
-[allowlist]
-description = "Allowlists for generated files, lockfiles and documentation placeholders"
+# Generated files and template files never contain real secrets.
+[[allowlists]]
+description = "Generated files, lockfiles and templates"
 paths = [
   '''Cargo\.lock''',
   '''package-lock\.json''',
   '''pnpm-lock\.yaml''',
   '''go\.sum''',
   '''.*\.example''',
-  '''deploy/.*\.cfg''',
 ]
+
+# Documentation placeholders and public on-chain identifiers (contract and
+# validator addresses are public and are not secrets).
+[[allowlists]]
+description = "Documentation placeholders and public on-chain identifiers"
+regexTarget = "line"
 regexes = [
   '''<redacted[^>]*>''',
   '''0x\.\.\.''',
   '''S\.\.\.''',
   '''YOUR_[A-Z_]+''',
+  '''STELLAR_PUSD_TOKEN=[GC][A-Z2-7]{55}''',
+  '''STELLAR_BRIDGE_CONTRACT=[GC][A-Z2-7]{55}''',
+  '''ARC_PUSD_TOKEN=0x[0-9a-fA-F]{40}''',
+  '''ARC_BRIDGE_CONTRACT=0x[0-9a-fA-F]{40}''',
+  '''ARC_VALIDATOR_[0-9]=0x[0-9a-fA-F]{40}''',
 ]
