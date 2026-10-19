@@ -369,6 +369,9 @@ User (Pi Testnet)                    Relayer                    Arc Testnet
 
 ## Environment Variables & Secrets
 
+> **Security notice:** secret values formerly shown in this document have been redacted. They were committed to git history and must be treated as compromised. Rotate the Stellar deployer key, PUSD admin key, Arc relayer key, and Cloudflare tunnel token, then purge the history. Never commit real secrets; use a secret manager.
+
+
 ### Root `.env` (Bridge Relayer)
 **Location:** `C:\Users\Binhdentist\Pi-horizon\.env`  
 **Gitignored:** Yes
@@ -388,9 +391,9 @@ ARC_BRIDGE_CONTRACT=0x765c4AdF71CFA7f1e9F6358Ca25A8216DC70B409
 ARC_PUSD_TOKEN=0x7534400f6F725326D5668d85d76b7bA0029aFEd8
 
 # Secrets (NOT committed)
-STELLAR_DEPLOYER_SECRET=SAGBFUFFHLHF5VV33BD5SG3KTJCECUFQQ6W42NDAXT3VAR6ZH6IDO3FZ
-STELLAR_PUSD_ADMIN_SECRET=SC6KWXPQRNN3LRUBU6W42KIM5QUUW7OVJIU57PKD6L7SHAVUGJPY7JTY
-ARC_RELAYER_PRIVATE_KEY=0x3892a7c7c0238f5727518538b7937780a4fbf96a3815fe59ffadd001c5447d3d
+STELLAR_DEPLOYER_SECRET=<redacted — rotate>
+STELLAR_PUSD_ADMIN_SECRET=<redacted — rotate>
+ARC_RELAYER_PRIVATE_KEY=<redacted — rotate>
 ```
 
 ### Arc Bridge `.env`
@@ -399,7 +402,7 @@ ARC_RELAYER_PRIVATE_KEY=0x3892a7c7c0238f5727518538b7937780a4fbf96a3815fe59ffadd0
 
 ```ini
 ARC_TESTNET_RPC=https://rpc.testnet.arc.io
-ARC_RELAYER_PRIVATE_KEY=0x3892a7c7c0238f5727518538b7937780a4fbf96a3815fe59ffadd001c5447d3d
+ARC_RELAYER_PRIVATE_KEY=<redacted — rotate>
 ARC_VALIDATOR_1=0x87E405646b5F4DE453Ba2a30EeF6F10CAA35554e
 ARC_VALIDATOR_2=0x4Bc4D2BB8ea9f41d9B369985fa0A15D48622720E
 ARC_VALIDATOR_3=0xdB2B68B6Ce36dFe59B5F93511c9958Af20B64Ec1
@@ -412,7 +415,7 @@ ARC_BRIDGE_CONTRACT=0x765c4AdF71CFA7f1e9F6358Ca25A8216DC70B409
 **Gitignored:** Yes
 
 ```ini
-TUNNEL_TOKEN=eyJhIjoiNzFhMzZkN2U0ZmI5MDljNzkyYjE2NGJkNmIzMTM1YmEiLCJ0IjoiMDY2MDcxM2YtYTA2Yy00NDkwLWI0YWEtZjgxNjYyZjJhZmM3IiwicyI6Ik9HUTFPRFk0TjJNdE56RXhNUzAwTXprNUxXSTBObUV0TmpoaE5TVTVZMlUxT0dFMCJ9
+TUNNEL_TOKEN=<redacted — rotate>
 ```
 
 ### Relayer `.env.example`

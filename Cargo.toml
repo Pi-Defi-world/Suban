@@ -25,6 +25,7 @@ members = [
     "contracts/node-staking",
     "contracts/identity",
     "contracts/escrow-factory",
+    "contracts/bridge-burn-mint",
 ]
 
 [workspace.package]

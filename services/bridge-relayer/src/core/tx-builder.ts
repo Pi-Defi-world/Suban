@@ -68,51 +68,22 @@ export class TransactionBuilder {
   }
 
   /**
-   * Build and submit burn transaction on Stellar after Arc burn
+   * Build and submit burn transaction on Stellar after Arc burn.
+   *
+   * DISABLED (Phase 0): the Stellar bridge now requires each signer to
+   * authorize the invocation (soroban require_auth). The relayer does not yet
+   * collect and attach those auth entries, so submitting a mint would fail.
+   * Re-enable only after signer authorization collection is implemented.
    */
   async buildStellarMint(
     event: ArcBurnEvent,
     recipient: string
   ): Promise<string> {
-    const fees = FeeCollector.calculate(event.amount);
-    FeeCollector.logFee("arc_to_stellar", event.sender, event.amount, fees);
-
-    logger.info(
-      `Building Stellar mint: ${fees.netAmount} PUSD to ${recipient}`
+    void event;
+    void recipient;
+    throw new Error(
+      "Arc->Stellar mint is disabled: signer authorization entries are not implemented"
     );
-
-    // Build Soroban transaction
-    const account = await this.stellarServer.getAccount(
-      this.stellarKeypair.publicKey()
-    );
-
-    const contract = new StellarSdk.Contract(config.stellar.bridgeContract);
-
-    const transaction = new StellarSdk.TransactionBuilder(account, {
-      fee: StellarSdk.BASE_FEE,
-      networkPassphrase: config.stellar.networkPassphrase,
-    })
-      .addOperation(
-        contract.call(
-          "mint_pusd",
-          new StellarSdk.Address(recipient).toScVal(),
-          StellarSdk.nativeToScVal(fees.netAmount, { type: "i128" }),
-          StellarSdk.nativeToScVal(event.sourceChain, { type: "string" }),
-          StellarSdk.nativeToScVal(event.nonce, { type: "u64" }),
-          StellarSdk.nativeToScVal(event.txHash, { type: "bytes32" }),
-          this.buildScValSignatures(event)
-        )
-      )
-      .setTimeout(StellarSdk.TimeoutInfinite)
-      .build();
-
-    // Sign
-    transaction.sign(this.stellarKeypair);
-
-    // Submit
-    const result = await this.stellarServer.sendTransaction(transaction);
-    logger.info(`Stellar mint submitted: ${result.hash}`);
-    return result.hash;
   }
 
   /**
@@ -142,31 +113,5 @@ export class TransactionBuilder {
 
     logger.info(`Signed cross-chain message: ${event.txHash}`);
     return [signature];
-  }
-
-  /**
-   * Build ScVal array of signatures for Soroban
-   * For testing: single-sig with relayer Stellar key
-   */
-  private buildScValSignatures(event: ArcBurnEvent): any {
-    // Build message to sign
-    const message = `bridge:mint:${event.sourceChain}:${event.amount}:${event.nonce}:${event.txHash}`;
-    const messageBuffer = Buffer.from(message, "utf8");
-
-    // Sign with Stellar relayer key (single-sig for testing)
-    const signingKeypair = StellarSdk.Keypair.fromSecret(
-      config.keys.stellarSigner
-    );
-    const signature = signingKeypair.sign(messageBuffer);
-
-    // Return as ScVal vec of (address, signature) tuples
-    const signerScVal = new StellarSdk.Address(
-      signingKeypair.publicKey()
-    ).toScVal();
-    const sigScVal = StellarSdk.nativeToScVal(signature, { type: "bytes" });
-
-    return StellarSdk.nativeToScVal([signerScVal, sigScVal], {
-      type: "vec",
-    });
   }
 }

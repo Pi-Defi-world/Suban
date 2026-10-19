@@ -1,0 +1,21 @@
+title = "Suban secret scanning"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allowlists for generated files, lockfiles and documentation placeholders"
+paths = [
+  '''Cargo\.lock''',
+  '''package-lock\.json''',
+  '''pnpm-lock\.yaml''',
+  '''go\.sum''',
+  '''.*\.example''',
+  '''deploy/.*\.cfg''',
+]
+regexes = [
+  '''<redacted[^>]*>''',
+  '''0x\.\.\.''',
+  '''S\.\.\.''',
+  '''YOUR_[A-Z_]+''',
+]

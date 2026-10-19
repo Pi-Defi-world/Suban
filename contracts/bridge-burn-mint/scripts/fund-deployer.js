@@ -3,7 +3,11 @@ const StellarSdk = require("@stellar/stellar-sdk");
 const HORIZON_URL = "https://api.testnet.minepi.com";
 const NETWORK_PASSPHRASE = "Pi Testnet";
 
-const FAUCET_SECRET = "SCB2NN44YEITKM2TEXCTPP3LB33DXFI3M7PKCVJU24UFELY6TTFGOD44";
+const FAUCET_SECRET = process.env.FAUCET_SECRET;
+if (!FAUCET_SECRET) {
+  console.error("FAUCET_SECRET is required");
+  process.exit(1);
+}
 const DEPLOYER_PUBLIC = "GAVRTDGVIRBQTNX5AWZPH2PRIS43HQ5WW2N4CGS426SOBC2EXPTKOHJF";
 
 async function main() {

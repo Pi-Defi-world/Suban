@@ -308,13 +308,12 @@ impl BridgeBurnMint {
 
     pub fn mint_pusd(
         env: Env,
-        _relayer: Address,
         recipient: Address,
         amount: i128,
         source_chain: Symbol,
         source_nonce: u64,
         source_tx_hash: BytesN<32>,
-        signatures: soroban_sdk::Vec<Address>,
+        signers: soroban_sdk::Vec<Address>,
     ) -> Result<(), BridgeError> {
         if is_paused(&env) {
             return Err(BridgeError::AlreadyPaused);
@@ -334,13 +333,16 @@ impl BridgeBurnMint {
 
         // Verify threshold
         let threshold = read_threshold(&env);
-        if signatures.len() < threshold {
+        if signers.len() < threshold {
             return Err(BridgeError::ThresholdNotMet);
         }
 
-        // Verify each signer
-        for i in 0..signatures.len() {
-            let signer = signatures.get(i).unwrap();
+        // Verify each signer is authorized for this invocation and is a member
+        // of the configured signer set. require_auth() is the cryptographic
+        // proof: a transaction cannot satisfy it without a signed auth entry
+        // from that address.
+        for i in 0..signers.len() {
+            let signer = signers.get(i).unwrap();
             let is_valid: bool = env
                 .storage()
                 .instance()
@@ -349,6 +351,16 @@ impl BridgeBurnMint {
             if !is_valid {
                 return Err(BridgeError::NotSigner);
             }
+
+            // Reject duplicates so one signer cannot count toward the threshold
+            // more than once.
+            for j in 0..i {
+                if signers.get(j).unwrap() == signer {
+                    return Err(BridgeError::DuplicateSigner);
+                }
+            }
+
+            signer.require_auth();
         }
 
         // Check mint cap (0 = no cap)
@@ -589,5 +601,238 @@ impl BridgeBurnMint {
             .instance()
             .get::<DataKey, bool>(&DataKey::Signer(signer))
             .unwrap_or(false)
+    }
+}
+
+// --- Tests ------------------------------------------------------------
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use soroban_sdk::{
+        contract, contractimpl,
+        testutils::{Address as _, MockAuth},
+        vec, Address, BytesN, Env, Symbol,
+    };
+
+    #[contract]
+    struct MockToken;
+
+    #[contractimpl]
+    impl MockToken {
+        pub fn mint(_env: Env, _to: Address, _amount: i128) {}
+
+        pub fn transfer(_env: Env, _from: Address, _to: Address, _amount: i128) {}
+    }
+
+    struct Setup {
+        env: Env,
+        client: BridgeBurnMintClient<'static>,
+        admin: Address,
+        token: Address,
+        signers: soroban_sdk::Vec<Address>,
+    }
+
+    fn setup(threshold: u32) -> Setup {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let admin = Address::generate(&env);
+        let token = env.register(MockToken, ());
+        let contract_id = env.register(BridgeBurnMint, ());
+        let client = BridgeBurnMintClient::new(&env, &contract_id);
+
+        let signers = vec![
+            &env,
+            Address::generate(&env),
+            Address::generate(&env),
+            Address::generate(&env),
+        ];
+
+        client.initialize(&admin, &signers, &threshold, &token, &1_000_000i128, &100u32);
+
+        Setup {
+            env,
+            client,
+            admin,
+            token,
+            signers,
+        }
+    }
+
+    fn tx_hash(env: &Env, byte: u8) -> BytesN<32> {
+        BytesN::from_array(env, &[byte; 32])
+    }
+
+    #[test]
+    fn test_initialize_sets_config() {
+        let s = setup(2);
+        let config = s.client.get_config();
+
+        assert_eq!(config.admin, s.admin);
+        assert_eq!(config.threshold, 2);
+        assert_eq!(config.signer_count, 3);
+        assert_eq!(config.pusd_token, s.token);
+        assert!(!config.paused);
+        assert!(s.client.is_signer(&s.signers.get(0).unwrap()));
+    }
+
+    #[test]
+    fn test_mint_succeeds_with_threshold() {
+        let s = setup(2);
+        let recipient = Address::generate(&s.env);
+
+        s.client.mint_pusd(
+            &recipient,
+            &100i128,
+            &Symbol::new(&s.env, "arc"),
+            &1u64,
+            &tx_hash(&s.env, 1),
+            &vec![&s.env, s.signers.get(0).unwrap(), s.signers.get(1).unwrap()],
+        );
+
+        assert!(s.client.is_processed(&tx_hash(&s.env, 1)));
+        assert_eq!(s.client.get_chain_minted(&Symbol::new(&s.env, "arc")), 100);
+    }
+
+    #[test]
+    fn test_mint_rejects_below_threshold() {
+        let s = setup(2);
+        let recipient = Address::generate(&s.env);
+
+        let result = s.client.try_mint_pusd(
+            &recipient,
+            &100i128,
+            &Symbol::new(&s.env, "arc"),
+            &1u64,
+            &tx_hash(&s.env, 2),
+            &vec![&s.env, s.signers.get(0).unwrap()],
+        );
+
+        assert_eq!(result, Err(Ok(BridgeError::ThresholdNotMet)));
+    }
+
+    #[test]
+    fn test_mint_rejects_non_signer() {
+        let s = setup(2);
+        let recipient = Address::generate(&s.env);
+        let outsider = Address::generate(&s.env);
+
+        let result = s.client.try_mint_pusd(
+            &recipient,
+            &100i128,
+            &Symbol::new(&s.env, "arc"),
+            &1u64,
+            &tx_hash(&s.env, 3),
+            &vec![&s.env, s.signers.get(0).unwrap(), outsider],
+        );
+
+        assert_eq!(result, Err(Ok(BridgeError::NotSigner)));
+    }
+
+    #[test]
+    fn test_mint_rejects_duplicate_signers() {
+        let s = setup(2);
+        let recipient = Address::generate(&s.env);
+        let signer = s.signers.get(0).unwrap();
+
+        let result = s.client.try_mint_pusd(
+            &recipient,
+            &100i128,
+            &Symbol::new(&s.env, "arc"),
+            &1u64,
+            &tx_hash(&s.env, 4),
+            &vec![&s.env, signer.clone(), signer],
+        );
+
+        assert_eq!(result, Err(Ok(BridgeError::DuplicateSigner)));
+    }
+
+    #[test]
+    fn test_mint_rejects_replay() {
+        let s = setup(2);
+        let recipient = Address::generate(&s.env);
+        let signers = vec![&s.env, s.signers.get(0).unwrap(), s.signers.get(1).unwrap()];
+
+        s.client.mint_pusd(
+            &recipient,
+            &100i128,
+            &Symbol::new(&s.env, "arc"),
+            &1u64,
+            &tx_hash(&s.env, 5),
+            &signers,
+        );
+
+        let result = s.client.try_mint_pusd(
+            &recipient,
+            &100i128,
+            &Symbol::new(&s.env, "arc"),
+            &1u64,
+            &tx_hash(&s.env, 5),
+            &signers,
+        );
+
+        assert_eq!(result, Err(Ok(BridgeError::AlreadyProcessed)));
+    }
+
+    #[test]
+    fn test_mint_requires_signer_authorization() {
+        let s = setup(2);
+        let recipient = Address::generate(&s.env);
+        let signers = vec![&s.env, s.signers.get(0).unwrap(), s.signers.get(1).unwrap()];
+
+        // Clear the blanket mock from setup: no auth entries are attached now.
+        s.env.set_auths(&[] as &[MockAuth]);
+
+        let result = s.client.try_mint_pusd(
+            &recipient,
+            &100i128,
+            &Symbol::new(&s.env, "arc"),
+            &1u64,
+            &tx_hash(&s.env, 6),
+            &signers,
+        );
+
+        assert!(
+            result.is_err(),
+            "mint must fail without signer authorization entries"
+        );
+        assert!(!s.client.is_processed(&tx_hash(&s.env, 6)));
+    }
+
+    #[test]
+    fn test_burn_increments_nonce_and_requires_auth() {
+        let s = setup(1);
+        let sender = Address::generate(&s.env);
+
+        let nonce = s.client.burn_pusd(
+            &sender,
+            &50i128,
+            &Symbol::new(&s.env, "arc"),
+        );
+
+        assert_eq!(nonce, 0);
+        assert_eq!(s.client.get_nonce(), 1);
+        assert_eq!(
+            s.client.get_chain_burned(&Symbol::new(&s.env, "arc")),
+            50
+        );
+    }
+
+    #[test]
+    fn test_burn_requires_sender_auth() {
+        let s = setup(1);
+        let sender = Address::generate(&s.env);
+
+        s.env.set_auths(&[] as &[MockAuth]);
+
+        let result = s.client.try_burn_pusd(
+            &sender,
+            &50i128,
+            &Symbol::new(&s.env, "arc"),
+        );
+
+        assert!(result.is_err(), "burn must require sender authorization");
+        assert_eq!(s.client.get_nonce(), 0);
     }
 }
