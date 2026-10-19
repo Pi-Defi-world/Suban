@@ -378,14 +378,18 @@ Status: ✅ done and verified · 🟡 done, pending CI/owner action · ⬜ not s
 |---|---|---|---|
 | 0.1 | Freeze bridge/mainnet capital work | ⬜ | Process decision, not a code change. |
 | 0.2 | Fix or disable oracle push | ✅ | `suban-controller/src/services/oracle-push.ts` now uses the Soroban `rpc.Server` (build → prepare → sign → send → poll) and passes all five `set_price` args (`admin, asset, price, decimals, confidence`). The broken zero-arg call is gone. Publishing is opt-in (`ORACLE_PUSH_ENABLED=false` by default) and needs `ORACLE_ASSET`. An on-chain integration test is still pending. |
-| 0.3 | Fix bridge mint verification | ✅ | `contracts/bridge-burn-mint`: `mint_pusd` no longer trusts a caller-supplied signature list. Every listed signer must be a configured signer, must be unique, and must `require_auth()` (the cryptographic proof). 8 unit tests cover threshold, non-signer, duplicate, replay and missing-authorization. The Arc→Stellar relayer path is explicitly disabled until signer auth entries are implemented. |
-| 0.4 | Rotate leaked secrets | 🟡 | Committed keys are removed from the working tree (`docs/PROJECT-REPORT.md`, deploy core configs, `fund-deployer.*` now read `FAUCET_SECRET` from env). gitleaks is in CI. **Owner action still required:** rotate the Stellar deployer, PUSD admin, Arc relayer keys and the Cloudflare tunnel token, then purge git history. |
+| 0.3 | Fix bridge mint verification | ✅ | `contracts/bridge-burn-mint`: `mint_pusd` no longer trusts a caller-supplied signature list. Every listed signer must be a configured signer, must be unique, and must `require_auth()` (the cryptographic proof). 9 unit tests cover initialization, threshold, non-signer, duplicate, replay and missing-authorization. The Arc→Stellar relayer path is explicitly disabled until signer auth entries are implemented. |
+| 0.4 | Rotate leaked secrets | 🟡 | Committed keys are removed from the working tree (`docs/PROJECT-REPORT.md`, deploy core configs, `fund-deployer.*` now read `FAUCET_SECRET` from env). gitleaks is in CI. **Owner action still required:** rotate the Stellar deployer, PUSD admin, Arc relayer keys and the Cloudflare tunnel token, then purge git history. Step-by-step runbook: `docs/SECRET-ROTATION.md`. |
 | 0.5 | Protect controller control routes | ✅ | `POST /price/commit` and `POST /circuit-breaker/reset` now require `CONTROLLER_ADMIN_API_KEY` (constant-time compare; 503 if unset) and are rate-limited per IP. 6 unit tests. |
 | 0.6 | Bring `bridge-burn-mint` into workspace | ✅ | Added to the root `Cargo.toml` members, `soroban-sdk 27` workspace dependency, nested lock removed. Verified with `cargo test -p bridge-burn-mint` in a Rust container. |
 | 0.7 | Add CI to all four repos | 🟡 | GitHub Actions added to all four repos (Rust workspace, TS typecheck/tests, Go build, pnpm, gitleaks). Pending the first green run on GitHub. |
 | 0.8 | Secret scanning and dependency audit | 🟡 | gitleaks in all four repos: working-tree scan is blocking, history scan is report-only. Verified clean on fresh checkouts. Dependency audit (`npm audit` / `cargo audit`) not yet wired. |
 
 **New defect found while adding CI (P1):** `suban-rpc` has two committed build artifacts, `pi-rpc` (~98 MB) and `db.test` (~59 MB), which bloat every clone and CI checkout. Remove them from git, add to `.gitignore`, and rewrite history (bundle with the D3 history purge).
+
+**New defect found while adding CI (P2):** `suban-rpc`'s `internal/preflight` tests target protocol 25 while the vendored Rust host is `soroban-env-host 23`, so `TestGetPreflight` fails before reaching application code. The package is still compiled by `go vet`, but its tests are excluded from the CI gate until the host is upgraded.
+
+**Dependency fix:** the `suban-rpc` Rust workspace had no committed lockfile, so a fresh checkout resolved `ed25519-dalek 3.x`, which uses `rand_core 0.10` and breaks the `soroban-env-host 23` testutils build. It is now pinned to `2.2.0`, the lockfile is committed, and `build-libs` uses `--locked` so CI builds a reviewed graph.
 
 ---
 
