@@ -53,4 +53,7 @@ export const config = {
 
   // Logging
   logLevel: process.env.LOG_LEVEL || "info",
+
+  // Metrics / health server
+  metricsPort: parseInt(process.env.METRICS_PORT || "9464"),
 };

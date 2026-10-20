@@ -1,12 +1,12 @@
-FROM node:20-slim
+FROM node:22-slim
 
 WORKDIR /app
 
 # Copy package files
-COPY package.json ./
+COPY package.json package-lock.json ./
 
 # Install dependencies
-RUN npm install
+RUN npm ci --no-audit --no-fund
 
 # Copy source
 COPY . .
@@ -14,8 +14,8 @@ COPY . .
 # Build TypeScript
 RUN npm run build
 
-# Expose port (for health checks)
-EXPOSE 3003
+# Expose metrics/health port
+EXPOSE 9464
 
 # Start relayer
 CMD ["npm", "start"]

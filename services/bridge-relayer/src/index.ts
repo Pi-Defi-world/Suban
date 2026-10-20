@@ -3,12 +3,22 @@ import { logger } from "./logger";
 import { StellarWatcher } from "./chains/stellar-watcher";
 import { ArcWatcher } from "./chains/arc-watcher";
 import { EventProcessor } from "./core/event-processor";
+import {
+  eventsSeen,
+  lastEventTimestamp,
+  relayerRunning,
+  startMetricsServer,
+  transfers,
+  updateProcessorStats,
+} from "./metrics";
+import http from "http";
 
 class BridgeRelayer {
   private stellarWatcher: StellarWatcher;
   private arcWatcher: ArcWatcher;
   private processor: EventProcessor;
   private running: boolean = false;
+  private metricsServer: http.Server | null = null;
 
   constructor() {
     this.stellarWatcher = new StellarWatcher(config.stellar.bridgeContract);
@@ -21,6 +31,8 @@ class BridgeRelayer {
   private setupEventHandlers(): void {
     // Stellar burn events → mint on Arc
     this.stellarWatcher.on("burn", async (event) => {
+      eventsSeen.inc({ chain: "stellar" });
+      lastEventTimestamp.set({ chain: "stellar" }, Math.floor(Date.now() / 1000));
       logger.info(
         `Stellar burn detected: ${event.amount} PUSD from ${event.sender}`
       );
@@ -29,6 +41,8 @@ class BridgeRelayer {
 
     // Arc burn events → mint on Stellar
     this.arcWatcher.on("burn", async (event) => {
+      eventsSeen.inc({ chain: "arc" });
+      lastEventTimestamp.set({ chain: "arc" }, Math.floor(Date.now() / 1000));
       logger.info(
         `Arc burn detected: ${event.amount} PUSD from ${event.sender}`
       );
@@ -37,10 +51,22 @@ class BridgeRelayer {
 
     // Processing events
     this.processor.on("completed", (event) => {
+      transfers.inc({
+        direction:
+          event.sourceChain === "stellar" ? "stellar->arc" : "arc->stellar",
+        status: "completed",
+      });
+      updateProcessorStats(this.processor.getStats());
       logger.info(`Bridge transfer completed: ${event.id}`);
     });
 
     this.processor.on("failed", (event) => {
+      transfers.inc({
+        direction:
+          event.sourceChain === "stellar" ? "stellar->arc" : "arc->stellar",
+        status: "failed",
+      });
+      updateProcessorStats(this.processor.getStats());
       logger.error(`Bridge transfer failed: ${event.id} - ${event.error}`);
     });
   }
@@ -48,6 +74,8 @@ class BridgeRelayer {
   async start(): Promise<void> {
     if (this.running) return;
     this.running = true;
+    relayerRunning.set(1);
+    this.metricsServer = startMetricsServer(config.metricsPort);
 
     logger.info("Starting bridge relayer...");
     logger.info(`Stellar RPC: ${config.stellar.rpcUrl}`);
@@ -63,14 +91,20 @@ class BridgeRelayer {
     // Log stats periodically
     setInterval(() => {
       const stats = this.processor.getStats();
+      updateProcessorStats(stats);
       logger.info("Relayer stats:", stats);
     }, 60000); // every minute
   }
 
   stop(): void {
     this.running = false;
+    relayerRunning.set(0);
     this.stellarWatcher.stop();
     this.arcWatcher.stop();
+    if (this.metricsServer) {
+      this.metricsServer.close();
+      this.metricsServer = null;
+    }
     logger.info("Bridge relayer stopped");
   }
 }

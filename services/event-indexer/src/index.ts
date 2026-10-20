@@ -10,6 +10,17 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import {
+  eventsIndexed,
+  fetchErrors,
+  httpMetricsMiddleware,
+  indexErrors,
+  lastLedger as lastLedgerGauge,
+  metricsHandler,
+  pollsTotal,
+  running as runningGauge,
+  storedEvents,
+} from './metrics.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -95,6 +106,17 @@ class EventIndexer {
     this.server = new rpc.Server(config.rpcUrl, { allowHttp: true });
     this.db = initDatabase(config.dbPath);
     this.config = config;
+
+    const row = this.db
+      .prepare('SELECT COUNT(*) as count FROM events')
+      .get() as { count: number };
+    storedEvents.set(row.count);
+    for (const contract of config.contracts) {
+      lastLedgerGauge.set(
+        { contract: contract.name },
+        this.getLastIndexedLedger(contract.contractId)
+      );
+    }
   }
 
   private getLastIndexedLedger(contractId: string): number {
@@ -130,6 +152,7 @@ class EventIndexer {
 
       return events.events || [];
     } catch (err: any) {
+      fetchErrors.inc({ contract: contractId });
       console.error(`Error fetching events for ${contractId}:`, err.message || err);
       return [];
     }
@@ -176,6 +199,8 @@ class EventIndexer {
 
       this.storeEvent(contractId, name, eventType, txHash, ledger, timestamp, data);
       this.totalEvents++;
+      eventsIndexed.inc({ contract: name, event_type: eventType });
+      storedEvents.inc();
 
       if (ledger > maxLedger) {
         maxLedger = ledger;
@@ -183,11 +208,13 @@ class EventIndexer {
     }
 
     this.updateLastIndexedLedger(contractId, maxLedger);
+    lastLedgerGauge.set({ contract: name }, maxLedger);
     console.log(`Indexed ${events.length} events for ${name} (ledger ${maxLedger})`);
   }
 
   async start() {
     this.running = true;
+    runningGauge.set(1);
     console.log(`Event indexer started, polling every ${this.config.pollIntervalMs}ms`);
     console.log(`Monitoring ${this.config.contracts.length} contracts`);
     console.log(`RPC: ${this.config.rpcUrl}`);
@@ -198,11 +225,13 @@ class EventIndexer {
 
     while (this.running) {
       this.pollCount++;
+      pollsTotal.inc();
       try {
         for (const contract of this.config.contracts) {
           await this.indexContract(contract);
         }
       } catch (err: any) {
+        indexErrors.inc({ stage: 'poll' });
         console.error('Indexing error:', err.message || err);
       }
 
@@ -212,6 +241,7 @@ class EventIndexer {
 
   stop() {
     this.running = false;
+    runningGauge.set(0);
     this.db.close();
     console.log('Event indexer stopped');
   }
@@ -276,11 +306,12 @@ function createApi(indexer: EventIndexer, port: number) {
   const app = express();
   app.use(cors());
   app.use(express.json());
+  app.use(httpMetricsMiddleware);
 
   app.get('/', (_req, res) => {
     res.json({
       name: 'Suban Event Indexer',
-      version: '0.1.0',
+      version: '0.2.0',
       description: 'Off-chain event indexer for Suban protocol contracts',
       endpoints: {
         status: '/status',
@@ -289,9 +320,21 @@ function createApi(indexer: EventIndexer, port: number) {
         eventsByType: '/events/type/:eventType',
         eventsByLedger: '/events/ledger/:ledger',
         stats: '/stats',
+        health: '/health',
+        metrics: '/metrics',
       },
     });
   });
+
+  app.get('/health', (_req, res) => {
+    res.json({
+      status: indexer.getStatus().running ? 'healthy' : 'degraded',
+      service: 'event-indexer',
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  app.get('/metrics', metricsHandler);
 
   app.get('/status', (_req, res) => {
     res.json(indexer.getStatus());

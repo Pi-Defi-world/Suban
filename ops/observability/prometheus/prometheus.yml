@@ -1,0 +1,26 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # The services run on the host during local development. In a compose
+  # deployment, replace host.docker.internal with the service DNS names.
+  - job_name: suban-controller
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:3000"]
+
+  - job_name: suban-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:4000"]
+
+  - job_name: suban-event-indexer
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:3002"]
+
+  - job_name: suban-bridge-relayer
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:9464"]

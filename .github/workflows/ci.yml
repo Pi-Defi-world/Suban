@@ -22,6 +22,15 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
+  rust-audit:
+    name: Rust dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
   sdk:
     name: SDK (TypeScript)
     runs-on: ubuntu-latest
@@ -33,7 +42,9 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
+      - name: Dependency audit (production, blocking)
+        run: npm audit --omit=dev --audit-level=high
       - run: npm run typecheck
       - run: npm test
 
@@ -52,7 +63,9 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
+      - name: Dependency audit (production, blocking)
+        run: npm audit --omit=dev --audit-level=high
       - run: npm run build
 
   frontend:
@@ -66,7 +79,9 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
+      - name: Dependency audit (production, blocking)
+        run: npm audit --omit=dev --audit-level=high
       - run: npm run build
 
   solidity:

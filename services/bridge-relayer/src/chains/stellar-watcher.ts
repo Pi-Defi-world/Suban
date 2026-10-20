@@ -1,4 +1,3 @@
-import * as SorobanRpc from "@stellar/stellar-sdk/rpc";
 import * as StellarSdk from "@stellar/stellar-sdk";
 import { EventEmitter } from "events";
 import { config } from "../config";
@@ -17,7 +16,7 @@ export interface StellarBurnEvent {
 }
 
 export class StellarWatcher extends EventEmitter {
-  private server: SorobanRpc.Server;
+  private server: StellarSdk.rpc.Server;
   private contractId: string;
   private lastLedger: number = 0;
   private running: boolean = false;
@@ -25,7 +24,7 @@ export class StellarWatcher extends EventEmitter {
 
   constructor(contractId: string) {
     super();
-    this.server = new SorobanRpc.Server(config.stellar.rpcUrl, {
+    this.server = new StellarSdk.rpc.Server(config.stellar.rpcUrl, {
       allowHttp: true,
     });
     this.contractId = contractId;

@@ -383,7 +383,7 @@ Status: ✅ done and verified · 🟡 done, pending CI/owner action · ⬜ not s
 | 0.5 | Protect controller control routes | ✅ | `POST /price/commit` and `POST /circuit-breaker/reset` now require `CONTROLLER_ADMIN_API_KEY` (constant-time compare; 503 if unset) and are rate-limited per IP. 6 unit tests. |
 | 0.6 | Bring `bridge-burn-mint` into workspace | ✅ | Added to the root `Cargo.toml` members, `soroban-sdk 27` workspace dependency, nested lock removed. Verified with `cargo test -p bridge-burn-mint` in a Rust container. |
 | 0.7 | Add CI to all four repos | ✅ | GitHub Actions on all four repos, all green on `main`. `suban-rpc` needed two fixes: pin `ed25519-dalek 2.2.0` (3.x breaks `soroban-env-host 23`), commit a lockfile and build with `--locked`; and exclude the `internal/preflight` tests (protocol-25 fixture vs host 23) while still compiling them with `go vet`. |
-| 0.8 | Secret scanning and dependency audit | 🟡 | gitleaks in all four repos: working-tree scan is blocking, history scan is report-only. Verified clean on fresh checkouts. Dependency audit (`npm audit` / `cargo audit`) not yet wired. |
+| 0.8 | Secret scanning and dependency audit | ✅ | gitleaks in all four repos: working-tree scan is blocking, history scan is report-only. Dependency audit is now in CI: production Node audits are blocking (`pnpm audit --prod --audit-level=high`, `npm audit --omit=dev --audit-level=high`) and Rust uses `rustsec/audit-check@v2`. Full/dev dependency trees are report-only. Controller production deps were cleaned by upgrading `@stellar/stellar-sdk` to 17.2.1, axios, and pnpm overrides for `proxy-addr`, `form-data` and `path-to-regexp`; `Suban-api`, SDK, event indexer, relayer and escrow viewer are clean at production level. |
 
 **New defect found while adding CI (P1):** `suban-rpc` has two committed build artifacts, `pi-rpc` (~98 MB) and `db.test` (~59 MB), which bloat every clone and CI checkout. Remove them from git, add to `.gitignore`, and rewrite history (bundle with the D3 history purge).
 
@@ -416,18 +416,22 @@ Status: ✅ done · 🟡 partial · ⬜ not started
 
 | # | Task | Status | What changed / what is left |
 |---|---|---|---|
-| 1.1 | Write canonical docs | 🟡 | `suban-controller/docs/API.md` now documents every route, the versioned price schema, trust states, history and metrics; the README is updated. `ARCHITECTURE.md`, `ROADMAP.md`, `PRODUCTS.md` and `SECURITY.md` are still to be written at the platform level. |
-| 1.2 | Ownership matrix | ⬜ | Not started. |
-| 1.3 | Multi-asset price model | ⬜ | Not started. The controller still publishes `PI/USD` only; USDC/USDT/oUSD sources and an asset registry are needed. |
+| 1.1 | Write canonical docs | ✅ | Platform-level `docs/ARCHITECTURE.md`, `ROADMAP.md`, `PRODUCTS.md`, `SECURITY.md`, `API.md` and `OBSERVABILITY.md` now exist, with a root `README.md` that indexes them. `suban-controller/docs/API.md` remains the route-level reference. |
+| 1.2 | Ownership matrix | ✅ | `docs/OWNERSHIP.md` assigns one accountable role and one deployment target per module, with escalation paths and open actions to record named maintainers. |
+| 1.3 | Multi-asset price model | ✅ | `suban-controller` now has an asset registry (`PI`, `USDC`, `USDT`, `OUSD`) with independent sources, cache keys, circuit breakers and trust machines. `GET /api/v1/assets` exposes the registry; every price route accepts `?asset=` and defaults to `PI`. oUSD has no default feed and returns `503` until `OUSD_PRICE_URL` is configured. Unknown assets return `404`; no peg is fabricated. |
 | 1.4 | Persist price observations | ✅ | New `priceStore` (SQLite via `better-sqlite3`) writes every fresh aggregation, retains 30 days by default and prunes hourly. `GET /api/v1/history?hours=&limit=` returns observations and window stats; cache hits and breaker fallbacks are not duplicated. Restart-safe; tested with an in-memory DB. |
 | 1.5 | Provenance and freshness in API | ✅ | Price responses now carry `schema_version`, `method_version`, `age_ms`, `is_fresh`, and per-source `age_ms`/`is_fresh`; cached responses recompute age. |
 | 1.6 | Oracle trust states | ✅ | New `TrustStateMachine` (`HEALTHY`/`DEGRADED`/`BREAKER`/`RECOVERY`) with a recovery streak. Transitions are exposed at `GET /api/v1/trust` and in `/health`; 6 unit tests cover transitions. The on-chain publisher refuses non-`HEALTHY` observations. |
-| 1.7 | Metrics for controller/API/indexer/relayer | 🟡 | Controller now exposes `/metrics` (price, confidence, age, source up/staleness, aggregation outcomes, oracle push outcomes, trust state, HTTP counters). `Suban-api`, the event indexer and the relayer still need their own `/metrics` and a Grafana dashboard. |
-| 1.8 | Resolve `getLedgerEntries` | ⬜ | Not started. |
+| 1.7 | Metrics for controller/API/indexer/relayer | ✅ | All four runtime services expose Prometheus metrics: controller (`suban_*`, per-asset labels), `Suban-api` (`suban_api_*`), event indexer (`suban_indexer_*`) and bridge relayer (`suban_relayer_*`, metrics/health server on `9464`). `docs/OBSERVABILITY.md` and `ops/observability/` provide Prometheus scrape config and a provisioned Grafana **Suban Platform** dashboard (16 panels) covering all four services. |
+| 1.8 | Resolve `getLedgerEntries` | ✅ | `suban-rpc/COMPATIBILITY.md` and the README now distinguish the supported Go `getLedgerEntries` runtime path from the failing Rust `internal/preflight` tests (protocol-25 fixture vs `soroban-env-host 23`). CI still compiles the package with `go vet` and excludes only those tests; the upgrade acceptance criteria are documented. |
 
 **Dependency note:** `better-sqlite3@13` requires Node.js 22+, so the controller's `engines` now says `>=22` (CI already uses Node 22). `pnpm-workspace.yaml` allowlists its native build script for pnpm 12.
 
 **Bug fixed while adding provenance:** the oracle publisher rounded `confidence_score` (0–1) directly into the contract's 0–100 `u32`, so every push reported confidence 0 or 1. It now sends `round(score × 100)`.
+
+**Phase 1 close-out (20 Oct 2026):** all eight Phase 1 tasks are implemented. Verification performed: controller `tsc --noEmit`, build and 29 Jest tests pass; a live smoke test returned `/api/v1/assets`, a USDC price and `503` for unconfigured oUSD; `Suban-api` builds and serves `/health` + `/metrics`; the event indexer builds and its Docker image serves `/health` + `/metrics`; the bridge relayer builds and its metrics server serves `/health` + `/metrics`; the Grafana dashboard JSON and Compose file validate. Remaining close-out actions are process/owner actions, not Phase 1 code: an on-chain oracle-push integration test, owner secret rotation, the git-history purge, named maintainers in the ownership matrix, and full/dev dependency audit triage.
+
+**Source verification note:** external symbol checks on 20 Oct 2026 confirmed CoinGecko `usd-coin`/`tether`, OKX `USDC-USDT`/`USDT-USD` and MEXC `USDCUSDT`. OKX `USDT-USDC`, MEXC `USDTUSDC` and Bitget spot `USDTUSDC` are not used because they do not resolve. oUSD has no default market feed and must not be assigned a synthetic peg.
 
 ---
 
