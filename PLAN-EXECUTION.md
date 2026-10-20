@@ -599,12 +599,12 @@ A module is done only when all are true:
 
 ## 14. Bottom line
 
-The plan is directionally right and unusually well written. The codebase is a credible start at L0 with a promising L1/L2 seed. The main risk is not technical ambition — it is **claiming capabilities that are not yet true** (oracle publishing, bridge security, admin separation, production readiness) and **lacking the operational discipline** (CI, secrets, metrics, integration tests) to support the plan's own Definition of Done.
+The plan is directionally right and unusually well written. The codebase is a credible start at L0 with a promising L1/L2 seed. The main risk is no longer missing operational basics — CI, production dependency audits, per-asset metrics and multi-asset pricing are now in place. The remaining risk is **claiming capabilities that are not yet true** (on-chain oracle publishing still lacks an integration test, the bridge is not production-ready, and secret rotation plus the git-history purge remain owner actions) and **operational execution** (named owners, monitoring, incident response).
 
 The fastest path to a platform that matches the plan is:
 
-1. **2 weeks:** make the current claims true and safe.
-2. **3 weeks:** document, multi-asset pricing, persistence, metrics.
+1. **2 weeks:** make the current claims true and safe. (Phase 0 code is done; secret rotation and history purge are owner-blocked.)
+2. **3 weeks:** document, multi-asset pricing, persistence, metrics. (Phase 1 is complete and CI-green as of 20 October 2026.)
 3. **6 weeks:** deliver a real data platform with keys, webhooks, and history.
 4. **Then** financial data, risk, execution, and capital — in that order, behind evidence gates.
 
@@ -612,4 +612,4 @@ That sequence preserves the plan's strategic thesis while removing the gap betwe
 
 ---
 
-*Prepared from the codebase as of 19 October 2026. File references are relative to `C:\Users\Binhdentist\suban-repos`.*
+*Prepared from the codebase as of 19 October 2026; Phase 1 close-out verified on 20 October 2026. File references are relative to `C:\Users\Binhdentist\suban-repos`.*
