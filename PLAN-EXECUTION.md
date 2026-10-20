@@ -410,6 +410,25 @@ Status: ✅ done and verified · 🟡 done, pending CI/owner action · ⬜ not s
 
 **Exit criterion:** docs match code; prices are multi-asset and persistent; all services have metrics; no contradictions.
 
+#### Phase 1 — progress log (20 Oct 2026)
+
+Status: ✅ done · 🟡 partial · ⬜ not started
+
+| # | Task | Status | What changed / what is left |
+|---|---|---|---|
+| 1.1 | Write canonical docs | 🟡 | `suban-controller/docs/API.md` now documents every route, the versioned price schema, trust states, history and metrics; the README is updated. `ARCHITECTURE.md`, `ROADMAP.md`, `PRODUCTS.md` and `SECURITY.md` are still to be written at the platform level. |
+| 1.2 | Ownership matrix | ⬜ | Not started. |
+| 1.3 | Multi-asset price model | ⬜ | Not started. The controller still publishes `PI/USD` only; USDC/USDT/oUSD sources and an asset registry are needed. |
+| 1.4 | Persist price observations | ✅ | New `priceStore` (SQLite via `better-sqlite3`) writes every fresh aggregation, retains 30 days by default and prunes hourly. `GET /api/v1/history?hours=&limit=` returns observations and window stats; cache hits and breaker fallbacks are not duplicated. Restart-safe; tested with an in-memory DB. |
+| 1.5 | Provenance and freshness in API | ✅ | Price responses now carry `schema_version`, `method_version`, `age_ms`, `is_fresh`, and per-source `age_ms`/`is_fresh`; cached responses recompute age. |
+| 1.6 | Oracle trust states | ✅ | New `TrustStateMachine` (`HEALTHY`/`DEGRADED`/`BREAKER`/`RECOVERY`) with a recovery streak. Transitions are exposed at `GET /api/v1/trust` and in `/health`; 6 unit tests cover transitions. The on-chain publisher refuses non-`HEALTHY` observations. |
+| 1.7 | Metrics for controller/API/indexer/relayer | 🟡 | Controller now exposes `/metrics` (price, confidence, age, source up/staleness, aggregation outcomes, oracle push outcomes, trust state, HTTP counters). `Suban-api`, the event indexer and the relayer still need their own `/metrics` and a Grafana dashboard. |
+| 1.8 | Resolve `getLedgerEntries` | ⬜ | Not started. |
+
+**Dependency note:** `better-sqlite3@13` requires Node.js 22+, so the controller's `engines` now says `>=22` (CI already uses Node 22). `pnpm-workspace.yaml` allowlists its native build script for pnpm 12.
+
+**Bug fixed while adding provenance:** the oracle publisher rounded `confidence_score` (0–1) directly into the contract's 0–100 `u32`, so every push reported confidence 0 or 1. It now sends `round(score × 100)`.
+
 ---
 
 ### Phase 2 — Data platform (Week 6–11)
