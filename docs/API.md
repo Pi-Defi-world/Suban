@@ -175,8 +175,9 @@ Returns versioned price/TWAP/risk methods and explicit gaps. In particular,
 ```
 
 Prices come from the live asset aggregators. Unknown assets return `404`,
-unconfigured assets and missing prices return `503` without partial results.
-Stale/non-`HEALTHY` prices are returned with `data_quality.status: "degraded"`.
+unconfigured assets, missing prices and stale prices return `503` without
+partial results. A fresh price whose trust state is not `HEALTHY` is returned
+with `data_quality.status: "degraded"`.
 The response contains `health_factor`, `collateral_value_usd`, `debt_value_usd`,
 `max_borrow_usd` and `liquidation_price_usd_per_collateral_unit` (single
 collateral only). The calculator does not read on-chain lending positions.

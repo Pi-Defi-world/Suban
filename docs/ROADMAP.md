@@ -96,7 +96,7 @@ tested; the exit criterion is not met.
 | 3.3 | TWAP and volatility | Done | `twap_volatility_v1` in `suban-controller/src/services/priceStats.ts`; pure deterministic tests and `/statistics`, `/twap`, `/volatility`. |
 | 3.4 | Oracle extension | Partial | Provenance, confidence, freshness and trust are exposed; `/methodology` is versioned. `liquidity_aware` is explicitly `false`; no pool-depth input exists. |
 | 3.5 | Risk engine v0 | Done | `lending_risk_v1` in `suban-controller/src/services/risk.ts`; deterministic vectors for health factor, collateral, max borrow and liquidation price. |
-| 3.6 | Risk API | Done | `/api/v1/risk/methods` and `POST /api/v1/risk/lending`; unknown/unconfigured/missing prices never produce partial fabricated values. |
+| 3.6 | Risk API | Done | `/api/v1/risk/methods` and `POST /api/v1/risk/lending`; unknown/unconfigured/missing/stale prices return `404`/`503` without partial fabricated values; fresh non-HEALTHY prices are labelled degraded. |
 | 3.7 | Consumer integration | Not met | No financial application consumes these APIs with measured usage yet. This is the blocking exit criterion. |
 
 **Exit:** at least one financial application consumes Suban financial data or

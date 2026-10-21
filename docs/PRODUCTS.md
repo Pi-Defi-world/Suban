@@ -91,7 +91,7 @@ yet offered. Status values are:
 | Interface | `GET /api/v1/risk/methods`, `POST /api/v1/risk/lending` |
 | Repository | `suban-controller` |
 | Status | Implemented as a calculator |
-| Limits | Does not read on-chain lending positions. Prices come from live aggregators; missing prices return `503`, stale prices are marked degraded. Liquidation price is `null` for multi-collateral baskets. |
+| Limits | Does not read on-chain lending positions. Prices come from live aggregators; missing or stale prices return `503`, fresh non-HEALTHY prices are marked degraded. Liquidation price is `null` for multi-collateral baskets. |
 
 ### 2.5 Financial event projections
 

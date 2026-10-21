@@ -491,7 +491,7 @@ implemented and tested; the consumer/exit criterion is not met.
 | 3.3 | TWAP and volatility | Done | `twap_volatility_v1`; deterministic pure-function tests; `/statistics`, `/twap`, `/volatility`. |
 | 3.4 | Oracle extension | Partial | Provenance/freshness/confidence/trust and `/methodology` are versioned. Liquidity-aware pricing is not implemented and is marked `false`. |
 | 3.5 | Risk engine v0 | Done | `lending_risk_v1`; deterministic vectors for health factor, collateral value, max borrow and liquidation price. |
-| 3.6 | Risk API | Done | `/risk/methods` and `POST /risk/lending`; unknown/unconfigured/missing prices return `404`/`503` without partial fabricated results; stale prices are labelled degraded. |
+| 3.6 | Risk API | Done | `/risk/methods` and `POST /risk/lending`; unknown/unconfigured/missing/stale prices return `404`/`503` without partial fabricated results; fresh non-HEALTHY prices are labelled degraded. |
 | 3.7 | Consumer integration | Not met | No internal or external financial app consumes the APIs with measured usage. |
 
 **Exit criterion:** at least one financial application consumes Suban financial data/oracle services, and freshness/confidence is visible to it. **Not met.**
