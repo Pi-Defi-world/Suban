@@ -52,6 +52,17 @@ jobs:
       - run: npm run typecheck
       - run: npm test
 
+  consumer:
+    name: Test consumer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Consumer contract tests
+        run: node --test tools/test-consumer/consumer.test.mjs
+
   services:
     name: Service ${{ matrix.service }}
     runs-on: ubuntu-latest

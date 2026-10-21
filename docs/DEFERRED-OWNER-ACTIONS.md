@@ -147,8 +147,9 @@ claimed.
 **Owner:** contract maintainers plus product/consumer owner.
 
 **Why deferred:** the Phase 3 projection and risk layers are implemented, but
-the contracts do not emit enough state for a real financial data product, and no
-application consumes the APIs with measured usage yet.
+the contracts do not emit enough state for a real financial data product. An
+internal test user now exercises the APIs, but no production application
+consumes them with measured usage.
 
 **Do later:**
 
@@ -156,14 +157,16 @@ application consumes the APIs with measured usage yet.
    CPMM/stableswap events, or index the corresponding contract state directly.
 2. Add lending-pool events for deposits, borrows, repayments, collateral changes
    and liquidations.
-3. Integrate one internal or external app that displays freshness/confidence and
-   records real usage.
+3. Replace the internal test user with a production consumer that displays
+   freshness/confidence and records real usage.
 4. Only then evaluate the Phase 3 exit criterion and the Phase 4 gate.
 
-**Current state:** `/financial/*` exposes raw event projections with
-`usd_volume=false` and `lp_positions=false`; the risk API is a deterministic
-calculator and does not read on-chain positions. Phase 3 is **not complete** and
-Phase 4 is not started.
+**Current state:** `tools/test-consumer/consumer.mjs` exercises the APIs and
+records freshness/confidence/coverage; it is not production adoption.
+`/financial/*` exposes raw event projections with `usd_volume=false` and
+`lp_positions=false`; the risk API is a deterministic calculator and does not
+read on-chain positions. Phase 3 is **not complete**. Phase 4 is limited to an
+SDK quote preview under an explicit gate override.
 
 ---
 

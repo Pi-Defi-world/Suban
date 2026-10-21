@@ -21,6 +21,9 @@ export {
 } from './amm.js';
 export type { PoolInfo, CpmmState, SwapResult } from './amm.js';
 
+export { quoteCpmm } from './quote.js';
+export type { CpmmQuote, CpmmQuoteInput } from './quote.js';
+
 export { LendingClient } from './lending.js';
 export type { LendingPosition, LendingPoolState } from './lending.js';
 

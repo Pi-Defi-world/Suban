@@ -24,7 +24,7 @@ In plain terms:
 
 **Recommendation:** do **not** start Q2–Q4 2027 execution/capital work yet. Run a 90-day "Consolidate" phase first: correctness, security, data persistence, observability, CI, and documentation. The platform's credibility depends on the controller and data layer being trustworthy, not on shipping more contracts.
 
-**Update (21 October 2026):** Phase 0–2 are complete. Phase 3 is **partial**: TWAP/volatility and the risk calculator are implemented and tested, and `/financial/*` exposes raw pool/trade/liquidity projections. The Phase 3 exit is not met because no real consumer is integrated, USD volume and LP positions are unavailable, and lending-pool events do not exist. Phase 4 remains gated.
+**Update (21 October 2026):** Phase 0–2 are complete. Phase 3 is **partial**: TWAP/volatility and the risk calculator are implemented and tested, and `/financial/*` exposes raw pool/trade/liquidity projections. An internal **test-user consumer** now exercises price provenance, TWAP, risk and financial coverage end-to-end, so the consumer mechanics are demonstrated; production adoption and measured external usage are still absent. USD volume and LP positions are unavailable, and lending-pool events do not exist. Phase 4 has started only as a **quote preview** under an explicit owner-requested gate override; no execution or capital work is claimed.
 
 ---
 
@@ -75,11 +75,11 @@ In plain terms:
 ### Section 8 — Financial infrastructure
 | Module | Status | Verdict |
 |---|---|---|
-| 8.1 Financial data | 🟡 | Pools, trades, liquidity events and activity projections exist; USD volume and LP positions are unavailable; no consumer. |
+| 8.1 Financial data | 🟡 | Pools, trades, liquidity events and activity projections exist; USD volume and LP positions are unavailable; an internal test-user consumer exists but production usage is absent. |
 | 8.2 Oracle extension | 🟡 | TWAP/volatility, persistent series, provenance and freshness exist; liquidity-aware pricing is not implemented and is marked false. |
 | 8.3 Risk engine | 🟡 | Shared deterministic risk module and `/risk/*` API exist; no on-chain lending-position ingestion. |
-| 8.4 Execution | ❌ | RPC simulation and SDK swap methods exist; no quote/route/price-impact service. |
-| 8.5 Controller-to-financial integration | 🟡 | Versioned price/statistics/risk contracts and financial event projections exist; no downstream consumer or usage measurement. |
+| 8.4 Execution | ❌ | RPC simulation and SDK swap methods exist; a deterministic CPMM quote preview exists in the SDK; no HTTP quote/route service or simulation parity yet. |
+| 8.5 Controller-to-financial integration | 🟡 | Versioned price/statistics/risk contracts and financial event projections exist; an internal test-user consumer exercises them and records coverage/freshness; production usage measurement is still absent. |
 | 8.6 Data quality model | 🟡 | Responses carry price/confidence/sources/freshness/trust and versioned methods; not the full plan metadata model. |
 | 8.7 Oracle trust model | ✅ | Explicit HEALTHY/DEGRADED/BREAKER/RECOVERY state machine with transition history. |
 | 8.8 Risk inputs | ❌ | No volatility/liquidity/concentration inputs. |
@@ -482,19 +482,20 @@ Status: done ● / partial ◐ / not started ○
 **Goal:** make L2 real, but derived from the now-reliable data layer.
 
 Status as of 21 October 2026: **partial**. The calculation/projection layer is
-implemented and tested; the consumer/exit criterion is not met.
+implemented and tested, and an internal test-user consumer now exercises the
+public routes. The production consumer/exit criterion is not met.
 
 | # | Task | Status | Evidence / gap |
 |---|---|---|---|
-| 3.1 | Financial data API | Partial | `/financial/*` pools, trades, liquidity, activity and summary derived from indexed events. Raw amounts only; USD volume and LP positions explicitly unavailable. Lending events absent. No consumer. |
+| 3.1 | Financial data API | Partial | `/financial/*` pools, trades, liquidity, activity and summary derived from indexed events. Raw amounts only; USD volume and LP positions explicitly unavailable. Lending events absent. |
 | 3.2 | Historical price series | Done | SQLite persistence and `/history`; reopen test proves 30-day-capable storage survives restart. |
 | 3.3 | TWAP and volatility | Done | `twap_volatility_v1`; deterministic pure-function tests; `/statistics`, `/twap`, `/volatility`. |
 | 3.4 | Oracle extension | Partial | Provenance/freshness/confidence/trust and `/methodology` are versioned. Liquidity-aware pricing is not implemented and is marked `false`. |
 | 3.5 | Risk engine v0 | Done | `lending_risk_v1`; deterministic vectors for health factor, collateral value, max borrow and liquidation price. |
 | 3.6 | Risk API | Done | `/risk/methods` and `POST /risk/lending`; unknown/unconfigured/missing/stale prices return `404`/`503` without partial fabricated results; fresh non-HEALTHY prices are labelled degraded. |
-| 3.7 | Consumer integration | Not met | No internal or external financial app consumes the APIs with measured usage. |
+| 3.7 | Consumer integration | Partial | `tools/test-consumer/consumer.mjs` is a deterministic internal test user. It exercises `/price`, `/statistics`, `/risk/lending`, `/financial/summary` and `/financial/pools`, requires freshness/confidence/coverage fields, records a JSON usage report and runs in CI. A live run against the rebuilt controller and indexer passed 5/5 checks. Production/external adoption and real usage measurement are still absent. |
 
-**Exit criterion:** at least one financial application consumes Suban financial data/oracle services, and freshness/confidence is visible to it. **Not met.**
+**Exit criterion:** at least one financial application consumes Suban financial data/oracle services, and freshness/confidence is visible to it. **Partially met by the internal test user; production/external usage is not claimed.** The test user is sufficient to exercise the consumer mechanics for plan execution, but not to claim Phase 3 complete.
 
 **Accepted gaps**
 
@@ -504,19 +505,22 @@ implemented and tested; the consumer/exit criterion is not met.
   derived from the indexer.
 - The risk API is a calculator over caller-supplied positions and live prices;
   it does not read on-chain lending state.
-- No consumer integration or usage measurement exists.
-
-Phase 4 remains gated by these gaps; no execution/capital work is claimed.
+- The internal test user records consumer-side usage, but there is no
+  production/external consumer or adoption measurement.
+- Phase 4 is allowed only as a preview under an explicit gate override; no
+  execution or capital work is claimed.
 
 **Verification (21 October 2026):**
 
 - `suban-controller`: `tsc` build passes; 43 Jest tests pass on Node 22 Docker.
 - `event-indexer`: `tsc --noEmit` passes; 15 Vitest tests pass on Node 22 Docker.
+- Test-user consumer: 3 Node contract tests pass; a live run against the rebuilt controller and indexer returned `status: ok` with 5/5 checks (price provenance, TWAP, risk, financial summary, financial pools). The report records `coverage.lp_positions=false` and `coverage.usd_volume=false` rather than inventing them.
+- SDK quote preview: `tsc --noEmit` passes; 20 Vitest tests pass, including 6 deterministic CPMM quote/wiring tests.
 - Live controller smoke test: `/api/v1/methodology` and `/api/v1/risk/methods` return `200`; `/api/v1/statistics` returns `503` with an empty history database; a future `as_of` returns `400`; unknown assets return `404` and malformed risk bodies return `400`.
 - CI: `suban-controller` run `39615138136` succeeded; `Suban` run `39614942129` succeeded.
 
-No USD volume, LP position, on-chain lending position or consumer usage is
-claimed.
+No USD volume, LP position, on-chain lending position or production consumer
+usage is claimed.
 
 ---
 
@@ -526,22 +530,23 @@ claimed.
 
 **Gate before starting:** data platform stable, oracle reliable, at least one consumer, no P0/P1 defects open.
 
-**Status (21 October 2026): not started.** Gate assessment:
+**Status (21 October 2026): preview started under an explicit owner-requested gate override.** The owner directed execution to continue without waiting for owner-only actions and to use an internal test user instead of a real consumer. This does **not** satisfy the Phase 4 gate and does **not** authorize capital. Only the deterministic quote preview is implemented; no execution, vault, liquidation or capital work is claimed.
 
 | Gate item | State |
 |---|---|
 | Data platform stable | Partial: Phase 2 routes/tests pass; public deployment, backfill and capacity are owner actions. |
-| Oracle reliable | Partial: trust states/history are implemented; on-chain push integration test and real consumer are missing. |
-| At least one consumer | Not met. |
+| Oracle reliable | Partial: trust states/history are implemented; on-chain push integration test is still missing. |
+| At least one consumer | Internal test user exists and passes live checks; production/external consumer is still absent. |
 | No open P0/P1 defects | Not met: secret rotation and git-history purge are owner-blocked; bridge mint authorization remains gated. |
 
-No quote service, vault, liquidation bot or capital work has started. The
-Phase 4 table below is a plan, not a claim of implementation.
+The Phase 4 table below remains the plan. The SDK quote preview is a partial
+implementation of 4.1/4.2 only; it is not a deployed `/quote` service and has not
+been matched against on-chain simulation.
 
 | # | Task | Deliverable | Acceptance criteria |
 |---|---|---|---|
-| 4.1 | Quote service | `/quote` using existing swap contracts | Matches on-chain simulation within tolerance |
-| 4.2 | Simulation API | Preflight + price impact | Reproducible results |
+| 4.1 | Quote service | `/quote` using existing swap contracts (preview: SDK `quoteCpmm` + `CpmmPoolClient.getQuote`) | Matches on-chain simulation within tolerance; not yet verified |
+| 4.2 | Simulation API | Preflight + price impact (preview: deterministic CPMM impact) | Reproducible results; HTTP API not yet built |
 | 4.3 | Route discovery | Only across real liquidity | No synthetic venues |
 | 4.4 | Vault framework (testnet) | Caps, pause, strategy isolation | Deposit/withdraw/pause tests pass |
 | 4.5 | Lending hardening | Oracle integration, liquidation tests | Liquidation path tested end-to-end |

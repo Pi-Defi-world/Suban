@@ -189,6 +189,12 @@ export class CpmmPoolClient {
     );
   }
 
+  /** Quote a swap using the on-chain read-only `get_quote` view. */
+  async getQuote(tokenIn: string, amountIn: string): Promise<string> {
+    const result = await this.client.simulate(this.contractId, 'get_quote', [tokenIn, amountIn]);
+    return String(result);
+  }
+
   /** Get pool state. */
   async getState(): Promise<CpmmState> {
     const [reserves, totalShares, feeBps] = await Promise.all([

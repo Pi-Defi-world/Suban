@@ -62,6 +62,8 @@ Service quick starts live in each service directory:
 | [API.md](docs/API.md) | Canonical API index and error/retry guidance |
 | [OBSERVABILITY.md](docs/OBSERVABILITY.md) | Metrics, dashboard, SLOs and alerts |
 | [DEVELOPER.md](docs/DEVELOPER.md) | Contract addresses, SDK usage and integration notes |
+| [TEST-CONSUMER.md](docs/TEST-CONSUMER.md) | Internal test user for price, risk and financial APIs |
+| [PHASE4-QUOTE-PREVIEW.md](docs/PHASE4-QUOTE-PREVIEW.md) | CPMM quote preview and explicit limits |
 | [PLAN-EXECUTION.md](PLAN-EXECUTION.md) | Current execution plan and honest progress log |
 | [plan.md](plan.md) | Canonical strategy and long-range narrative |
 
