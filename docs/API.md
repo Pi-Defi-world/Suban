@@ -145,6 +145,42 @@ Query: `hours` (1–720, default 24), `limit` (1–10000, default 1000). Returns
 observations newest first plus window stats. Breaker observations are stored for
 audit but excluded from public stats.
 
+### 4.3.1 `GET /api/v1/statistics`, `/twap`, `/volatility`
+
+All three paths return the same `twap_volatility_v1` calculation from persisted
+observations. Query: `asset`, `window` (`60s`-`30d`; `5m`, `24h`, `30d` or
+seconds), and optional `as_of` for replay. `coverage_ratio` and `warnings`
+report partial history; an empty window returns `503`, never a fabricated
+value. Volatility is `null` with fewer than two returns.
+
+### 4.3.2 `GET /api/v1/methodology`
+
+Returns versioned price/TWAP/risk methods and explicit gaps. In particular,
+`price_quality.liquidity_aware` is `false`; no pool-depth input exists yet.
+
+### 4.3.3 Risk API
+
+`GET /api/v1/risk/methods` publishes formulas, defaults and limitations for
+`lending_risk_v1`.
+
+`POST /api/v1/risk/lending` accepts:
+
+```json
+{
+  "collateral": [{ "asset": "PI", "amount": 100 }],
+  "debt": [{ "asset": "USDC", "amount": 5 }],
+  "liquidation_threshold": 0.8,
+  "target_health_factor": 1.5
+}
+```
+
+Prices come from the live asset aggregators. Unknown assets return `404`,
+unconfigured assets and missing prices return `503` without partial results.
+Stale/non-`HEALTHY` prices are returned with `data_quality.status: "degraded"`.
+The response contains `health_factor`, `collateral_value_usd`, `debt_value_usd`,
+`max_borrow_usd` and `liquidation_price_usd_per_collateral_unit` (single
+collateral only). The calculator does not read on-chain lending positions.
+
 ### 4.4 `GET /api/v1/trust?asset=PI`
 
 Returns the current trust state and transition history. `?limit=` bounds history
@@ -243,10 +279,20 @@ from SQLite and never calls Horizon or Soroban RPC in a query handler.
 | `GET /accounts/:accountId` | Indexed account or activity stub |
 | `GET /accounts/:id/transactions` | Transactions involving the account |
 | `GET /accounts/:id/operations` | Operations involving the account |
+| `GET /financial/pools` | Pool activity derived from swap/liquidity events |
+| `GET /financial/pools/:contractId` | Raw volume, recent events and explicit gap flags |
+| `GET /financial/pools/:contractId/trades` | Swap events with raw amounts |
+| `GET /financial/pools/:contractId/liquidity` | Add/remove-liquidity events |
+| `GET /financial/accounts/:accountId/activity` | Bounded recent account activity |
+| `GET /financial/summary` | Financial event counts and latest event |
 | `GET /ledgers` | Recent indexed ledgers |
 | `GET /ledgers/:sequence` | One indexed ledger |
 | `GET /health` | `200` healthy, `503` degraded/stale |
 | `GET /metrics` | Prometheus metrics (`suban_indexer_*`) |
+
+Financial routes expose raw event amounts only. `coverage.usd_volume` and
+`coverage.lp_positions` are `false`: current events do not carry token
+direction, decimals or LP balances. No USD value is inferred.
 
 All data responses include `schema_version: "2.0"` and `freshness`:
 

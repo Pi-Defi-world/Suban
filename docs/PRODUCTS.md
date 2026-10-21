@@ -55,7 +55,7 @@ yet offered. Status values are:
 |---|---|
 | What | Independent PI/USD, USDC/USD, USDT/USD and oUSD/USD aggregation with provenance, freshness, confidence and trust states |
 | For | Applications, risk systems and contracts that need a defensible price rather than a single exchange ticker |
-| Interface | `/api/v1/assets`, `/api/v1/price?asset=...`, `/api/v1/history`, `/api/v1/trust`, `/api/v1/sources`, `/api/v1/health`, `/metrics` on `:3000` |
+| Interface | `/api/v1/assets`, `/api/v1/price?asset=...`, `/api/v1/history`, `/api/v1/trust`, `/api/v1/sources`, `/api/v1/health`, `/api/v1/methodology`, `/metrics` on `:3000` |
 | Repository | `suban-controller` |
 | Status | Implemented |
 | Limits | oUSD requires an explicit HTTP feed (`OUSD_PRICE_URL`); without it the asset returns `503` and is never assigned a fabricated peg. PI source weights and freshness policy are configuration, not universal truth. |
@@ -75,12 +75,34 @@ yet offered. Status values are:
 
 | | |
 |---|---|
-| What | Append-only SQLite observations plus 24h/window high, low, open, close and count |
+| What | Append-only SQLite observations plus window high, low, open, close and count; versioned TWAP and volatility |
 | For | Charts, dashboards, audits and downstream analytics |
-| Interface | `/api/v1/history?asset=...&hours=...&limit=...` |
+| Interface | `/api/v1/history?asset=...&hours=...&limit=...`, `/api/v1/statistics`, `/api/v1/twap`, `/api/v1/volatility` |
 | Repository | `suban-controller` |
 | Status | Implemented |
-| Limits | 30-day default retention; breaker observations are stored for audit but excluded from public stats. |
+| Limits | 30-day default retention; breaker observations are stored for audit but excluded from public stats. TWAP/volatility return `503` when no observations exist and label partial coverage. |
+
+### 2.4 Deterministic risk calculator
+
+| | |
+|---|---|
+| What | Versioned lending-risk formulas: collateral value, debt value, health factor, max borrow and single-collateral liquidation price |
+| For | Integrators that want consistent risk math before on-chain lending-state indexing exists |
+| Interface | `GET /api/v1/risk/methods`, `POST /api/v1/risk/lending` |
+| Repository | `suban-controller` |
+| Status | Implemented as a calculator |
+| Limits | Does not read on-chain lending positions. Prices come from live aggregators; missing prices return `503`, stale prices are marked degraded. Liquidation price is `null` for multi-collateral baskets. |
+
+### 2.5 Financial event projections
+
+| | |
+|---|---|
+| What | Pool, trade, liquidity and bounded account-activity views derived from indexed contract events |
+| For | Explorers and analytics that need to inspect real swap/liquidity activity |
+| Interface | `/financial/pools`, `/financial/pools/:id`, `/trades`, `/liquidity`, `/financial/accounts/:id/activity`, `/financial/summary` on the data platform (`:3002`) |
+| Repository | `Suban/services/event-indexer` |
+| Status | Partial |
+| Limits | Raw amounts only; USD volume and LP positions are explicitly unavailable. Current events lack token direction/decimals and LP balances. Lending events do not exist. No consumer integration yet. |
 
 ## 3. Value-movement products
 

@@ -1,6 +1,6 @@
 # Suban Data Platform
 
-Status: canonical data-platform architecture (Phase 2, October 2026).
+Status: canonical data-platform architecture (Phase 2 complete, Phase 3 financial projections partial, October 2026).
 
 The data platform is the indexed-data layer behind Suban's developer promise:
 consume Pi and Suban data without running a node. It is **implemented and
@@ -106,11 +106,33 @@ Routes:
 | `GET /accounts/:id` | `accounts` | Stub or full snapshot |
 | `GET /accounts/:id/transactions` | join | Account involvement index |
 | `GET /accounts/:id/operations` | join | Account involvement index |
+| `GET /financial/pools` and `/financial/pools/:id` | `events` | Pool activity derived from swap/liquidity events |
+| `GET /financial/pools/:id/trades` | `events` | Raw swap amounts; token direction/USD value unavailable |
+| `GET /financial/pools/:id/liquidity` | `events` | Add/remove-liquidity events |
+| `GET /financial/accounts/:id/activity` | `events` | Bounded recent activity; not LP positions |
+| `GET /financial/summary` | `events` | Event counts and latest financial event |
 | `GET /ledgers`, `/ledgers/:sequence` | `ledgers` | Indexed ledger history |
 
 Pagination is `limit`/`offset` (`limit` max 1000). Time filters accept ISO-8601
 or Unix seconds. The legacy `/events/contract/:id`, `/events/type/:type` and
 `/events/ledger/:ledger` shapes are preserved and wrapped with freshness.
+
+### 4.1 Financial projections (Phase 3, partial)
+
+The `/financial/*` routes project swap and liquidity events into pool, trade and
+activity views. They are deliberately conservative:
+
+- `coverage.usd_volume` is `false`. Events contain two raw amounts but not token
+  direction or decimals; no USD conversion is invented.
+- `coverage.lp_positions` is `false`. Current LP-token balances are not indexed.
+- `GET /financial/accounts/:id/activity` scans at most the 5,000 most recent
+  financial events because the account is encoded in topic XDR.
+- Lending-pool events are not emitted by the current contract, so lending
+  positions, liquidations and risk inputs cannot be derived from this service.
+
+These are Phase 3 gaps, not implied capabilities. The controller's risk API is a
+deterministic calculator over supplied amounts and live prices; it does not read
+on-chain lending positions either.
 
 ## 5. Freshness and SLOs
 
@@ -167,6 +189,10 @@ is seeded from deployment config and can be updated through admin routes.
 - No production-sized backfill has been run; default bootstrap windows are
   deliberately small.
 - Contract verification is metadata-only.
+- Financial projections expose raw event amounts only; USD volume and LP
+  positions are not available from current contract events.
+- Lending-pool events are absent, so loan positions and liquidations are not
+  indexed.
 
 Owner-blocked actions that are intentionally deferred are tracked in
 [`DEFERRED-OWNER-ACTIONS.md`](./DEFERRED-OWNER-ACTIONS.md).

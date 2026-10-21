@@ -413,6 +413,11 @@ Horizon/RPC. Send `x-api-key` when the deployment requires public keys.
 | `GET /accounts/:id/operations` | GET | Operations involving an account |
 | `GET /ledgers` | GET | Recent indexed ledgers |
 | `GET /contracts` | GET | Contract metadata registry |
+| `GET /financial/pools` | GET | Pool activity derived from swap/liquidity events |
+| `GET /financial/pools/:id/trades` | GET | Raw swap amounts; no invented USD value |
+| `GET /financial/pools/:id/liquidity` | GET | Add/remove-liquidity events |
+| `GET /financial/accounts/:id/activity` | GET | Bounded recent financial-event activity |
+| `GET /financial/summary` | GET | Financial event counts and latest event |
 | `GET /status` | GET | Counts, checkpoints and freshness |
 
 Every response includes `schema_version` and `freshness`; check

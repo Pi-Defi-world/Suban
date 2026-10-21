@@ -15,7 +15,7 @@ integrate.
 | [`Suban`](https://github.com/Pi-Defi-world/Suban) (this repo) | Contracts, shared Rust crates, SDK, event indexer, bridge relayer, escrow viewer, deployment and observability assets |
 | [`suban-rpc`](https://github.com/Pi-Defi-world/suban-rpc) | Pi JSON-RPC: network queries, transaction submission, status/history, simulation, Soroban interaction |
 | [`Suban-api`](https://github.com/Pi-Defi-world/Suban-api) | Horizon-compatible REST API with caching, rate limiting and enhanced endpoints |
-| [`suban-controller`](https://github.com/Pi-Defi-world/suban-controller) | Multi-asset price aggregation, provenance, trust states, history and optional on-chain oracle publication |
+| [`suban-controller`](https://github.com/Pi-Defi-world/suban-controller) | Multi-asset price aggregation, provenance, trust states, history, TWAP/volatility, deterministic risk API and optional on-chain oracle publication |
 
 ## Services and ports
 
@@ -23,7 +23,7 @@ integrate.
 |---|---|---|
 | Controller | `3000` | Market data/oracle; control routes authenticated |
 | Data API | `4000` | Horizon-compatible reads |
-| Event indexer / data platform | `3002` | Indexed ledgers, transactions, operations, accounts and contract events; public keys/quotas and webhooks |
+| Event indexer / data platform | `3002` | Indexed ledgers, transactions, operations, accounts and contract events; public keys/quotas and webhooks. Financial projections are partial (raw amounts; no USD volume or LP positions) |
 | Bridge relayer | `9464` | Metrics/health only; no public API |
 | RPC | `8000` / `8001` | Public JSON-RPC / private admin |
 | Horizon | `31401` / `41401` | Testnet / mainnet local Horizon |

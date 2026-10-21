@@ -14,15 +14,17 @@ The plan is a good **strategy document**. The implementation is a real but narro
 
 In plain terms:
 
-- **What is real:** RPC, Horizon/API, escrow, the core contract set, the SDK, the four-source price aggregator, the event indexer, and the Docker deployment.
-- **What is early:** indexing, historical data, contract discovery, controller security, observability.
-- **What is paper:** financial data API, TWAP, risk engine, execution/quote service, capital vaults, liquidation network, settlement.
-- **What is broken or overstated:** on-chain oracle publication, bridge mint authorization, controller admin protection, secret hygiene, CI.
+- **What is real:** RPC, Horizon/API, escrow, the core contract set, the SDK, the four-source price aggregator, the event indexer, persistent price history, TWAP/volatility, a deterministic risk calculator, raw financial event projections, and the Docker deployment.
+- **What is early:** indexing, historical backfill, contract discovery, controller security, observability, financial consumer integration.
+- **What is paper:** execution/quote service, capital vaults, liquidation network, settlement; liquidity-aware pricing and on-chain lending-position risk are not implemented.
+- **What is broken or overstated:** on-chain oracle publication, bridge mint authorization, secret hygiene, CI coverage of owner-managed deployment.
 - **What is accurate:** Section 3 ("Current State") is a fair description of the repos. The plan's own note at line 258 about missing USDC/USD/oUSD/USDT pricing is correct.
 
 **Overall score (judgment call, not a formal metric):** roughly **45% of the plan's "current state" is true; about 20% of the 2026–2027 target architecture is built.**
 
-**Recommendation:** do **not** start Q2–Q4 2027 work (risk, execution, capital) yet. Run a 90-day "Consolidate" phase first: correctness, security, data persistence, observability, CI, and documentation. The platform's credibility depends on the controller and data layer being trustworthy, not on shipping more contracts.
+**Recommendation:** do **not** start Q2–Q4 2027 execution/capital work yet. Run a 90-day "Consolidate" phase first: correctness, security, data persistence, observability, CI, and documentation. The platform's credibility depends on the controller and data layer being trustworthy, not on shipping more contracts.
+
+**Update (21 October 2026):** Phase 0–2 are complete. Phase 3 is **partial**: TWAP/volatility and the risk calculator are implemented and tested, and `/financial/*` exposes raw pool/trade/liquidity projections. The Phase 3 exit is not met because no real consumer is integrated, USD volume and LP positions are unavailable, and lending-pool events do not exist. Phase 4 remains gated.
 
 ---
 
@@ -73,13 +75,13 @@ In plain terms:
 ### Section 8 — Financial infrastructure
 | Module | Status | Verdict |
 |---|---|---|
-| 8.1 Financial data | ❌ | No pools, volume, trades, LP positions, financial events, portfolio views. |
-| 8.2 Oracle extension | 🟡 | Freshness/breaker exist; no TWAP, no persistent series, no provenance metadata, no liquidity-aware pricing. |
-| 8.3 Risk engine | ❌ | Lending has internal health-factor math, but no shared risk service or API. |
+| 8.1 Financial data | 🟡 | Pools, trades, liquidity events and activity projections exist; USD volume and LP positions are unavailable; no consumer. |
+| 8.2 Oracle extension | 🟡 | TWAP/volatility, persistent series, provenance and freshness exist; liquidity-aware pricing is not implemented and is marked false. |
+| 8.3 Risk engine | 🟡 | Shared deterministic risk module and `/risk/*` API exist; no on-chain lending-position ingestion. |
 | 8.4 Execution | ❌ | RPC simulation and SDK swap methods exist; no quote/route/price-impact service. |
-| 8.5 Controller-to-financial integration | ❌ | No normalized financial-data contract, no historical store, no downstream consumer. |
-| 8.6 Data quality model | ❌ | Responses carry price/confidence/sources, but not the full metadata model in the plan. |
-| 8.7 Oracle trust model | 🟡 | There is a circuit breaker, but no explicit HEALTHY/DEGRADED/BREAKER/RECOVERY state machine. |
+| 8.5 Controller-to-financial integration | 🟡 | Versioned price/statistics/risk contracts and financial event projections exist; no downstream consumer or usage measurement. |
+| 8.6 Data quality model | 🟡 | Responses carry price/confidence/sources/freshness/trust and versioned methods; not the full plan metadata model. |
+| 8.7 Oracle trust model | ✅ | Explicit HEALTHY/DEGRADED/BREAKER/RECOVERY state machine with transition history. |
 | 8.8 Risk inputs | ❌ | No volatility/liquidity/concentration inputs. |
 | 8.9 Build conditions | 🟡 | Correctly not building capital products yet. |
 
@@ -479,17 +481,32 @@ Status: done ● / partial ◐ / not started ○
 
 **Goal:** make L2 real, but derived from the now-reliable data layer.
 
-| # | Task | Deliverable | Acceptance criteria |
-|---|---|---|---|
-| 3.1 | Financial data API | Pools, liquidity, volume, trades, LP positions | At least one real consumer (internal or external) |
-| 3.2 | Historical price series | Persisted observations + query API | 30-day query works after restart |
-| 3.3 | TWAP and volatility | Methodology + versioned calculation | Reproducible from stored observations |
-| 3.4 | Oracle extension | Provenance/confidence/liquidity-aware pricing | Methodology documented and versioned |
-| 3.5 | Risk engine v0 | Health factor, collateral value, liquidation price | Deterministic test vectors; versioned formulas |
-| 3.6 | Risk API | `/risk/*` endpoints | Degraded results when inputs are missing; never fabricated |
-| 3.7 | Consumer integration | One internal app or service | Measured usage recorded |
+Status as of 21 October 2026: **partial**. The calculation/projection layer is
+implemented and tested; the consumer/exit criterion is not met.
 
-**Exit criterion:** at least one financial application consumes Suban financial data/oracle services, and freshness/confidence is visible to it.
+| # | Task | Status | Evidence / gap |
+|---|---|---|---|
+| 3.1 | Financial data API | Partial | `/financial/*` pools, trades, liquidity, activity and summary derived from indexed events. Raw amounts only; USD volume and LP positions explicitly unavailable. Lending events absent. No consumer. |
+| 3.2 | Historical price series | Done | SQLite persistence and `/history`; reopen test proves 30-day-capable storage survives restart. |
+| 3.3 | TWAP and volatility | Done | `twap_volatility_v1`; deterministic pure-function tests; `/statistics`, `/twap`, `/volatility`. |
+| 3.4 | Oracle extension | Partial | Provenance/freshness/confidence/trust and `/methodology` are versioned. Liquidity-aware pricing is not implemented and is marked `false`. |
+| 3.5 | Risk engine v0 | Done | `lending_risk_v1`; deterministic vectors for health factor, collateral value, max borrow and liquidation price. |
+| 3.6 | Risk API | Done | `/risk/methods` and `POST /risk/lending`; unknown/unconfigured/missing prices return `404`/`503` without partial fabricated results; stale prices are labelled degraded. |
+| 3.7 | Consumer integration | Not met | No internal or external financial app consumes the APIs with measured usage. |
+
+**Exit criterion:** at least one financial application consumes Suban financial data/oracle services, and freshness/confidence is visible to it. **Not met.**
+
+**Accepted gaps**
+
+- Pool events lack pool address, reserves, token direction/decimals and reliable
+  initial LP state.
+- `lending-pool` emits no events, so positions and liquidations cannot be
+  derived from the indexer.
+- The risk API is a calculator over caller-supplied positions and live prices;
+  it does not read on-chain lending state.
+- No consumer integration or usage measurement exists.
+
+Phase 4 remains gated by these gaps; no execution/capital work is claimed.
 
 ---
 

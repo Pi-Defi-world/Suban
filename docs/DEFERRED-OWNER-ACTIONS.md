@@ -142,6 +142,29 @@ backfill and capacity testing are deployment decisions.
 **Current state:** local and Docker smoke tests pass; public deployment is not
 claimed.
 
+## 9. Phase 3 event coverage and consumer
+
+**Owner:** contract maintainers plus product/consumer owner.
+
+**Why deferred:** the Phase 3 projection and risk layers are implemented, but
+the contracts do not emit enough state for a real financial data product, and no
+application consumes the APIs with measured usage yet.
+
+**Do later:**
+
+1. Add pool identity, reserves, token direction/decimals and initial LP state to
+   CPMM/stableswap events, or index the corresponding contract state directly.
+2. Add lending-pool events for deposits, borrows, repayments, collateral changes
+   and liquidations.
+3. Integrate one internal or external app that displays freshness/confidence and
+   records real usage.
+4. Only then evaluate the Phase 3 exit criterion and the Phase 4 gate.
+
+**Current state:** `/financial/*` exposes raw event projections with
+`usd_volume=false` and `lp_positions=false`; the risk API is a deterministic
+calculator and does not read on-chain positions. Phase 3 is **not complete** and
+Phase 4 is not started.
+
 ---
 
 ## Recording rule

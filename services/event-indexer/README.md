@@ -138,11 +138,25 @@ All data routes return `schema_version` and a `freshness` object:
 | `GET /accounts/:accountId` | Indexed account/stub and optional snapshot |
 | `GET /accounts/:id/transactions` | Transactions involving an account |
 | `GET /accounts/:id/operations` | Operations involving an account |
+| `GET /financial/pools` | Pools with event counts and aggregate trade/liquidity activity |
+| `GET /financial/pools/:contractId` | One pool's raw volume, recent events and gap flags |
+| `GET /financial/pools/:contractId/trades` | Normalized swap events (raw amounts) |
+| `GET /financial/pools/:contractId/liquidity` | Add/remove-liquidity events |
+| `GET /financial/accounts/:accountId/activity` | Bounded recent financial-event activity |
+| `GET /financial/summary` | Financial event counts and latest event time |
 | `GET /ledgers` | Recent indexed ledgers |
 | `GET /ledgers/:sequence` | One indexed ledger |
 
 Pagination is limit/offset (`limit` max 1000, default 100). Time filters accept
 ISO-8601 or Unix seconds. Response keys are snake_case.
+
+Financial views are projections over the same indexed events. They expose raw
+token amounts and counts, but set `coverage.usd_volume=false` and
+`coverage.lp_positions=false`: the contracts do not emit token direction,
+decimals, reserves or LP balances. Raw volume is never converted to USD with an
+assumed price. Account activity scans at most the 5,000 most recent financial
+events because account addresses are encoded inside topic XDR and cannot be
+filtered in SQL.
 
 `stale` is true when `lag_ledgers > INDEXER_MAX_LAG_LEDGERS` (default 10), when
 the last successful poll is older than `INDEXER_STALE_AFTER_SECONDS` (default
@@ -250,3 +264,8 @@ The full catalog and alert thresholds are in
   code or bytecode.
 - Full historical backfill from genesis is an operator choice; default bootstraps
   are intentionally small.
+- Financial views do not provide USD volume or LP positions. Contract events
+  carry raw amounts but not token direction/decimals or LP balances; those
+  values remain unavailable rather than inferred.
+- Lending-pool activity has no contract events yet, so `/financial/*` cannot
+  report lending positions or liquidations.

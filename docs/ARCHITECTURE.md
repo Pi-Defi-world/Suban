@@ -1,6 +1,6 @@
 # Suban Architecture
 
-Status: canonical platform architecture (Phase 2, October 2026).
+Status: canonical platform architecture (Phase 2 complete, Phase 3 partial, October 2026).
 
 This document explains how the Suban repositories and services fit together. It
 is the entry point for new contributors and integrators; deep-dive documents are
@@ -82,7 +82,9 @@ genuinely requires it.
 - Each asset has its own source set, cache key, circuit breaker and trust state
   machine. Assets cannot contaminate each other's provenance.
 - Persists fresh observations in SQLite (`PRICE_DB_PATH`, 30-day default
-  retention) and exposes history/statistics.
+  retention) and exposes history, versioned TWAP/volatility and a deterministic
+  lending-risk calculator. Liquidity-aware pricing is not implemented and is
+  marked `false` in `/api/v1/methodology`.
 - Publishes healthy observations to a Soroban oracle contract only when
   `ORACLE_PUSH_ENABLED=true` and the asset has an oracle address.
 - Exposes Prometheus metrics on `/metrics`.
@@ -105,7 +107,9 @@ staleness + outlier filtering + weighted aggregation
 confidence + explicit trust state (HEALTHY/DEGRADED/BREAKER/RECOVERY)
         │
         ├── SQLite price_observations (audit, history, stats)
-        ├── /api/v1/price, /history, /trust, /assets, /metrics
+        ├── /api/v1/price, /history, /statistics, /twap, /volatility
+        ├── /api/v1/risk/lending (deterministic calculator, live prices)
+        ├── /api/v1/trust, /assets, /methodology, /metrics
         └── optional Soroban set_price (HEALTHY only)
 ```
 
@@ -126,9 +130,13 @@ Design rules:
   Soroban contract events via RPC, and Pi ledgers/transactions/operations/account
   activity via Horizon.
 - Serves `/events`, `/transactions`, `/operations`, `/accounts`, `/ledgers`,
-  `/contracts`, `/status`, `/stats`, `/health` and `/metrics` on `:3002`.
+  `/contracts`, `/financial/*`, `/status`, `/stats`, `/health` and `/metrics` on
+  `:3002`.
 - Answers historical queries from SQLite only; no query handler calls Horizon or
   RPC. All data responses carry `schema_version` and `freshness`.
+- Financial projections expose raw swap/liquidity amounts. USD volume and LP
+  positions are explicitly unavailable because current events do not carry
+  token direction/decimals or LP balances.
 - Owns the contract metadata registry (`contracts`), public API-key quotas,
   webhook outbox/retries and replay checkpoints.
 - Not a source of truth: it is a replayable derived view. A replay from a

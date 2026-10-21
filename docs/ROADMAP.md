@@ -15,7 +15,7 @@ calendar promises. The canonical strategy narrative remains
 | 0 | Stabilize and make claims true | **Complete except owner actions** | No known critical defect; CI green; no secrets in the tree |
 | 1 | Consolidate L0/L2 | **Complete** | Docs match code; multi-asset persistent prices; all services have metrics; no contradictions |
 | 2 | Data platform (L1) | **Implemented; deployment/owner actions pending** | External developer can build an explorer/analytics app using only Suban APIs |
-| 3 | Financial data and risk (L2) | Not started | At least one application consumes Suban financial data/oracle with freshness/confidence visible |
+| 3 | Financial data and risk (L2) | **Partial (21 Oct 2026)** | At least one application consumes Suban financial data/oracle with freshness/confidence visible |
 | 4 | Execution and controlled capital | Not started | Measurable usage justifies one capital/execution product; audit complete before mainnet capital |
 | 5 | 2027 portfolio selection | Not started | Choose the winning product from evidence |
 
@@ -86,18 +86,33 @@ document does not claim a live public data platform.
 
 **Goal:** make financial data real, but derived from a reliable data layer.
 
-| # | Task | Acceptance |
-|---|---|---|
-| 3.1 | Financial data API | Pools, liquidity, volume, trades, LP positions; at least one real consumer |
-| 3.2 | Historical price series | 30-day query works after restart |
-| 3.3 | TWAP and volatility | Methodology versioned and reproducible from stored observations |
-| 3.4 | Oracle extension | Provenance/confidence/liquidity-aware pricing, documented |
-| 3.5 | Risk engine v0 | Health factor, collateral value, liquidation price; deterministic vectors |
-| 3.6 | Risk API | `/risk/*`; degraded when inputs are missing, never fabricated |
-| 3.7 | Consumer integration | One internal or external app; usage recorded |
+Status: **partial**. The calculation and projection layer is implemented and
+tested; the exit criterion is not met.
+
+| # | Task | Status | Evidence / gap |
+|---|---|---|---|
+| 3.1 | Financial data API | Partial | `/financial/pools`, `/trades`, `/liquidity`, `/accounts/:id/activity`, `/summary` project indexed events. USD volume and LP positions are unavailable because events do not carry token direction/decimals or LP balances. Lending events do not exist yet. No real consumer. |
+| 3.2 | Historical price series | Done | SQLite persistence with 30-day retention and `/history`; restart test covers reopen. |
+| 3.3 | TWAP and volatility | Done | `twap_volatility_v1` in `suban-controller/src/services/priceStats.ts`; pure deterministic tests and `/statistics`, `/twap`, `/volatility`. |
+| 3.4 | Oracle extension | Partial | Provenance, confidence, freshness and trust are exposed; `/methodology` is versioned. `liquidity_aware` is explicitly `false`; no pool-depth input exists. |
+| 3.5 | Risk engine v0 | Done | `lending_risk_v1` in `suban-controller/src/services/risk.ts`; deterministic vectors for health factor, collateral, max borrow and liquidation price. |
+| 3.6 | Risk API | Done | `/api/v1/risk/methods` and `POST /api/v1/risk/lending`; unknown/unconfigured/missing prices never produce partial fabricated values. |
+| 3.7 | Consumer integration | Not met | No financial application consumes these APIs with measured usage yet. This is the blocking exit criterion. |
 
 **Exit:** at least one financial application consumes Suban financial data or
-oracle services, with freshness/confidence visible to it.
+oracle services, with freshness/confidence visible to it. Not met. Phase 4
+remains gated.
+
+**Known gaps (accepted, not hidden):**
+
+- Pool events omit pool address, reserve state, token direction/decimals and
+  reliable initial LP positions.
+- `lending-pool` has no events, so positions, liquidations and on-chain risk
+  inputs cannot be derived.
+- The risk API is a calculator over caller-supplied amounts and live prices; it
+  does not read lending state.
+- No consumer has been integrated or measured.
+
 
 ## 6. Phase 4 — Execution and controlled capital
 

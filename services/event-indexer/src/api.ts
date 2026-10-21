@@ -11,6 +11,7 @@ import { IndexerConfig, SCHEMA_VERSION } from './config.js';
 import { createAdminMiddleware, createApiKeyMiddleware, QuotaStore } from './apiKeys.js';
 import { getFreshness } from './freshness.js';
 import { SubanIngestor, upsertContract } from './ingest.js';
+import { createFinancialRouter } from './financial.js';
 import { httpMetricsMiddleware, metricsHandler } from './metrics.js';
 import { WebhookStore } from './webhooks.js';
 
@@ -198,6 +199,8 @@ export function createApi(deps: ApiDependencies): express.Express {
         status: '/status',
         contracts: '/contracts',
         events: '/events',
+        financialPools: '/financial/pools',
+        financialSummary: '/financial/summary',
         transactions: '/transactions',
         operations: '/operations',
         accounts: '/accounts/:accountId',
@@ -226,6 +229,7 @@ export function createApi(deps: ApiDependencies): express.Express {
 
   const publicApi = express.Router();
   publicApi.use(createApiKeyMiddleware(config, quota));
+  publicApi.use('/financial', createFinancialRouter(db, payload));
 
   publicApi.get('/status', (_req, res) => {
     const counts = {
