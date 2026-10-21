@@ -1,6 +1,6 @@
 # Suban API
 
-Status: canonical API index (Phase 1, October 2026).
+Status: canonical API index (Phase 2, October 2026).
 
 This is the entry point for API consumers. Detailed per-service documents are
 linked below; when they disagree with this index, the service document wins for
@@ -12,7 +12,7 @@ its own routes and this index is updated in the same change.
 |---|---|---|---|
 | Controller (market data/oracle) | `http://localhost:3000` | `https://oracle.suban.org` | [`suban-controller/docs/API.md`](../../suban-controller/docs/API.md) |
 | Data API (Horizon-compatible) | `http://localhost:4000` | `https://horizon.suban.org` | [`../Suban-api/README.md`](../../Suban-api/README.md) |
-| Event indexer | `http://localhost:3002` | internal service | [`../services/event-indexer/README.md`](../services/event-indexer/README.md) |
+| Data platform (indexed history) | `http://localhost:3002` | `https://data.suban.org` (target; not yet provisioned) | [`../services/event-indexer/README.md`](../services/event-indexer/README.md) |
 | Bridge relayer (metrics/health only) | `http://localhost:9464` | internal worker | [`../docs/OBSERVABILITY.md`](./OBSERVABILITY.md) |
 | RPC | `http://localhost:8000` | `https://rpc.suban.org` | [`../../suban-rpc/README.md`](../../suban-rpc/README.md) |
 
@@ -23,10 +23,16 @@ the public developer surface.
 ## 2. Versioning and compatibility
 
 - Public HTTP routes are versioned under `/api/v1` (data API and controller).
+  The data platform uses unversioned resource paths (`/events`, `/transactions`,
+  `/operations`, `/accounts`, `/ledgers`) and carries `schema_version: "2.0"`
+  in every data response.
 - The controller price payload carries `schema_version` (`1.0` today) and
   `method_version` (`weighted_average_v1`). Breaking shape changes bump
   `schema_version`; methodology changes bump `method_version`.
 - Adding a field is backward-compatible. Removing/renaming a field is not.
+- The data platform (`/events`, `/transactions`, `/operations`, `/accounts`,
+  `/ledgers`) returns `schema_version: "2.0"` and a `freshness` object on every
+  data response. Breaking shape changes bump `schema_version`; additions do not.
 - Error responses use `{ "error": "message" }`; controller price errors may add
   `asset` and `available_assets`.
 - Unknown assets return `404`; known but unconfigured assets return `503`. Do
@@ -36,7 +42,9 @@ the public developer surface.
 
 | Surface | Auth | Limits |
 |---|---|---|
-| Public read routes | None | Per-IP rate limit at the edge and in the service |
+| Data API public read routes | None | Per-IP rate limit at the edge and in the service |
+| Data platform public read routes | `x-api-key` or `Authorization: Bearer <key>` when `INDEXER_REQUIRE_API_KEY=true` | Per-key minute/day quotas; `429` + `Retry-After` |
+| Data platform admin routes | `INDEXER_ADMIN_API_KEY` | Private network; `503` if unset |
 | Controller control routes | `x-api-key: <key>` or `Authorization: Bearer <key>` | Per-IP limit, default 30/min |
 | Controller oracle publisher | `ORACLE_ADMIN_SECRET` (server-side only) | Opt-in; not an HTTP route |
 | RPC admin API (`:8001`) | Private network only | Do not expose |
@@ -212,24 +220,65 @@ Rate limit: default 100 requests/60s per IP; `/metrics` is exempt. Upstream
 failures return `{ "error": "Horizon API error", "message": "..." }` with the
 upstream status or `500`.
 
-## 6. Event indexer
+## 6. Data platform (indexed history)
 
-Base: `http://localhost:3002`.
+Base: `http://localhost:3002`. This is the historical/indexed API. It answers
+from SQLite and never calls Horizon or Soroban RPC in a query handler.
 
 | Route | Purpose |
 |---|---|
 | `GET /` | Service metadata and endpoint list |
-| `GET /status` | Indexer status (running, contracts, counts) |
-| `GET /stats` | Event counts and per-contract stats |
-| `GET /events` | Recent events (`limit`, `offset`) |
-| `GET /events/contract/:contractId` | Events by contract |
-| `GET /events/type/:eventType` | Events by type |
-| `GET /events/ledger/:ledger` | Events at a ledger |
-| `GET /health` | Liveness/degraded |
+| `GET /status` | Counts, checkpoints, freshness, Horizon state |
+| `GET /stats` | Counts and per-contract event totals |
+| `GET /contracts` | Contract metadata registry (network/address/interface/verification) |
+| `GET /contracts/:contractId` | One registry entry |
+| `GET /contracts/:contractId/events` | Events for one contract |
+| `GET /events` | Events (`contract`, `type`, `from`, `to`, `ledger_from`, `ledger_to`, `limit`, `offset`) |
+| `GET /events/contract/:id` | Events by contract (legacy shape, freshness-wrapped) |
+| `GET /events/type/:type` | Events by type (legacy shape, freshness-wrapped) |
+| `GET /events/ledger/:ledger` | Events at a ledger (legacy shape, freshness-wrapped) |
+| `GET /transactions` | Transactions (`account`, `ledger`, `from`, `to`, `successful`, `limit`, `offset`) |
+| `GET /transactions/:hash` | Indexed transaction; `404` if not indexed |
+| `GET /operations` | Operations (`account`, `tx_hash`, `ledger`, `type`, `from`, `to`, `limit`, `offset`) |
+| `GET /accounts/:accountId` | Indexed account or activity stub |
+| `GET /accounts/:id/transactions` | Transactions involving the account |
+| `GET /accounts/:id/operations` | Operations involving the account |
+| `GET /ledgers` | Recent indexed ledgers |
+| `GET /ledgers/:sequence` | One indexed ledger |
+| `GET /health` | `200` healthy, `503` degraded/stale |
 | `GET /metrics` | Prometheus metrics (`suban_indexer_*`) |
 
-The indexer is a derived, replayable view. Consumers should use the `ledger` and
-`timestamp` fields to detect lag rather than assuming real-time delivery.
+All data responses include `schema_version: "2.0"` and `freshness`:
+
+```json
+{
+  "schema_version": "2.0",
+  "freshness": {
+    "as_of": "2026-10-21T11:47:52.494Z",
+    "latest_indexed_ledger": 29329977,
+    "latest_observed_ledger": 29329977,
+    "lag_ledgers": 0,
+    "lag_seconds": 3,
+    "last_success_at": "2026-10-21T11:47:48.619Z",
+    "stale": false,
+    "stale_after_seconds": 120
+  },
+  "data": []
+}
+```
+
+Pagination is `limit`/`offset` (`limit` max 1000, default 100). Time filters
+accept ISO-8601 or Unix seconds. `stale` is true when ledger lag exceeds
+`INDEXER_MAX_LAG_LEDGERS` (default 10), when the last success is older than
+`INDEXER_STALE_AFTER_SECONDS` (default 120), or before the first success.
+Consumers must check `freshness.stale`; do not assume real-time delivery.
+
+Admin routes (`/admin/replay`, `/admin/checkpoints`, `/admin/contracts`,
+`/admin/webhooks`, `/admin/api-keys/usage`) require
+`INDEXER_ADMIN_API_KEY`. A replay reproduces state from a checkpoint; writes are
+idempotent.
+
+See [`DATA-PLATFORM.md`](./DATA-PLATFORM.md) for the schema and replay contract.
 
 ## 7. Bridge relayer
 
@@ -270,7 +319,9 @@ preflight test coverage, not `getLedgerEntries`. See
 ## 10. Related documents
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — service responsibilities and data flow.
+- [DATA-PLATFORM.md](./DATA-PLATFORM.md) — indexed schema, freshness, replay and webhooks.
 - [PRODUCTS.md](./PRODUCTS.md) — what each API is for.
 - [SECURITY.md](./SECURITY.md) — auth, keys and threat model.
 - [OBSERVABILITY.md](./OBSERVABILITY.md) — metrics and dashboards.
+- [DEFERRED-OWNER-ACTIONS.md](./DEFERRED-OWNER-ACTIONS.md) — owner follow-ups.
 - [DEVELOPER.md](./DEVELOPER.md) — contract addresses and SDK usage.

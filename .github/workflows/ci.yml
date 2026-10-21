@@ -71,6 +71,7 @@ jobs:
       - name: Dependency audit (production, blocking)
         run: npm audit --omit=dev --audit-level=high
       - run: npm run build
+      - run: npm test --if-present
 
   frontend:
     name: Escrow viewer

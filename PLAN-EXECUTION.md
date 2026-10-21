@@ -452,6 +452,25 @@ Status: ✅ done · 🟡 partial · ⬜ not started
 
 **Exit criterion:** an external developer can build an explorer/analytics app using only Suban APIs, with no node access.
 
+#### Phase 2 — progress log (21 Oct 2026)
+
+Status: done ● / partial ◐ / not started ○
+
+| # | Task | Status | What changed / what is left |
+|---|---|---|---|
+| 2.1 | Normalize event/account/tx/operation data | Done | `event-indexer/src/db.ts` adds schema `2.0` with `schema_migrations`, normalized `ledgers`, `transactions`, `operations`, `accounts`, `events`, `contracts`, account-involvement indexes, `checkpoints`, API-key usage and webhook outbox. The upgrade from the Phase 1 events database is additive and preserves rows. Migration/idempotency/upgrade tests pass. |
+| 2.2 | Expand indexer ingestion | Done | Two checkpointed streams: Soroban events via RPC and Horizon ledgers/transactions/operations/accounts. Writes are idempotent; replay from a checkpoint is tested to reproduce the same rows. Horizon pagination is bounded; account snapshots are bounded per poll; `429`/`5xx` responses retry with backoff. |
+| 2.3 | Indexer operations | Done | Metrics for ledger/transaction/operation/account counts, ingestion lag (ledgers and seconds), operation completeness, reorg signals, replay resets, API-key outcomes and webhook delivery. Grafana dashboard now has 22 panels; `prometheus/alerts.yml` contains thresholds for lag, staleness, completeness, reorg, fetch errors, webhook pressure and quota pressure. |
+| 2.4 | Contract metadata registry | Done | `contracts` table records network/address/name/interface version/verification/metadata. Seeded from deployment config; admin CRUD exists. Discovery no longer depends on scanning events. `verified` is explicitly an operator assertion, not source verification. |
+| 2.5 | Public API keys and quotas | Done | Keys are configured by hash; minute/day counters persist in SQLite; `429` includes `Retry-After`; per-key usage is visible at `GET /admin/api-keys/usage`; admin routes return `503` when unconfigured. |
+| 2.6 | Webhooks | Done | Subscription filters, durable SQLite outbox, unique `(subscription,event)`, HMAC-SHA256 signature, stable idempotency key, bounded exponential backoff and delivery-state API. Tests cover idempotent enqueue, signature, retry and terminal failure. |
+| 2.7 | Historical query API | Done | `/events`, `/transactions`, `/operations`, `/accounts/:id`, `/ledgers`, `/contracts` and `/status` query SQLite only. No query handler calls Horizon or RPC. `404` means not indexed, not missing on chain. |
+| 2.8 | Data freshness guarantees | Done | Every data response includes `schema_version` and `freshness` (`latest_indexed_ledger`, `latest_observed_ledger`, `lag_ledgers`, `lag_seconds`, `last_success_at`, `stale`, `stale_after_seconds`). `/health` returns `503` when stale. |
+
+**Phase 2 verification:** TypeScript build passes; 13 data-platform tests pass in a Node 22 container; Docker image builds and a live smoke test against local Horizon indexed 19 ledgers, 53 transactions, 56 operations and 64 accounts, then served `/health`, `/stats`, `/status`, `/transactions`, `/operations`, `/ledgers`, `/accounts/:id`, `/contracts`, `/metrics` and admin checkpoints/usage with correct API-key behavior. `/health` transitioned to `200` once the first ledger was durable. The Grafana JSON and Prometheus config are validated separately. CI must be green on all affected repos before this log is treated as final.
+
+**Phase 2 close-out note:** code and route contracts for 2.1–2.8 are complete. The public hostname/TLS, production-sized backfill and capacity test are deployment actions, not code; they are tracked with the other owner-blocked items in `docs/DEFERRED-OWNER-ACTIONS.md`. Do not describe `data.suban.org` as live until that deployment is actually verified.
+
 ---
 
 ### Phase 3 — Financial data and risk (Week 12–17)
@@ -605,11 +624,11 @@ The fastest path to a platform that matches the plan is:
 
 1. **2 weeks:** make the current claims true and safe. (Phase 0 code is done; secret rotation and history purge are owner-blocked.)
 2. **3 weeks:** document, multi-asset pricing, persistence, metrics. (Phase 1 is complete and CI-green as of 20 October 2026.)
-3. **6 weeks:** deliver a real data platform with keys, webhooks, and history.
+3. **6 weeks:** deliver a real data platform with keys, webhooks, and history. (Phase 2 code and route contracts are complete as of 21 October 2026; public deployment and owner actions remain.)
 4. **Then** financial data, risk, execution, and capital — in that order, behind evidence gates.
 
 That sequence preserves the plan's strategic thesis while removing the gap between what the document says and what the system does.
 
 ---
 
-*Prepared from the codebase as of 19 October 2026; Phase 1 close-out verified on 20 October 2026. File references are relative to `C:\Users\Binhdentist\suban-repos`.*
+*Prepared from the codebase as of 19 October 2026; Phase 1 close-out verified on 20 October 2026; Phase 2 implementation verified on 21 October 2026. File references are relative to `C:\Users\Binhdentist\suban-repos`.*

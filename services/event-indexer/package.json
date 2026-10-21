@@ -1,14 +1,16 @@
 {
   "name": "@suban/event-indexer",
-  "version": "0.2.0",
-  "description": "Off-chain event indexer for Suban protocol contracts",
+  "version": "2.0.0",
+  "description": "Indexed Pi data platform: ledgers, transactions, operations, accounts, contract events, API keys and webhooks",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@stellar/stellar-sdk": "^17.2.1",
@@ -23,6 +25,7 @@
     "@types/express": "^4.17.21",
     "@types/node": "^22.0.0",
     "tsx": "^4.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "vitest": "^1.6.1"
   }
 }

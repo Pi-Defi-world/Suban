@@ -1,6 +1,6 @@
 # Suban Architecture
 
-Status: canonical platform architecture (Phase 1, October 2026).
+Status: canonical platform architecture (Phase 2, October 2026).
 
 This document explains how the Suban repositories and services fit together. It
 is the entry point for new contributors and integrators; deep-dive documents are
@@ -120,15 +120,22 @@ Design rules:
 - **Per-asset independence.** Trust and breaker state never leak between PI,
   USDC, USDT and oUSD.
 
-### 3.4 `event-indexer` — indexed contract events
+### 3.4 `event-indexer` — data platform
 
-- Polls configured Soroban contracts, stores normalized events in SQLite and
-  serves `/events`, `/stats`, `/status`, `/health` and `/metrics` on `:3002`.
-- Tracks a per-contract last-indexed ledger in `index_state`.
-- Intended for explorers, analytics and applications that should not run their
-  own ingestion pipeline.
-- Not a source of truth: it is a replayable derived view. Re-indexing must be
-  possible from a checkpoint.
+- Ingests two checkpointed streams into one normalized SQLite schema:
+  Soroban contract events via RPC, and Pi ledgers/transactions/operations/account
+  activity via Horizon.
+- Serves `/events`, `/transactions`, `/operations`, `/accounts`, `/ledgers`,
+  `/contracts`, `/status`, `/stats`, `/health` and `/metrics` on `:3002`.
+- Answers historical queries from SQLite only; no query handler calls Horizon or
+  RPC. All data responses carry `schema_version` and `freshness`.
+- Owns the contract metadata registry (`contracts`), public API-key quotas,
+  webhook outbox/retries and replay checkpoints.
+- Not a source of truth: it is a replayable derived view. A replay from a
+  checkpoint must reproduce the same rows; writes are idempotent.
+- Testnet/experimental: public DNS/TLS and a production-sized backfill are
+  deployment actions, not completed claims. See
+  [`DATA-PLATFORM.md`](./DATA-PLATFORM.md).
 
 ### 3.5 `bridge-relayer` — PUSD cross-chain worker
 
@@ -159,7 +166,7 @@ Design rules:
 | Pi node / Horizon | `deploy/` | Chain state, Horizon API | Re-sync from network |
 | `suban-rpc` SQLite | `suban-rpc` | Tx status/history | Rebuild from node/config |
 | `prices.db` | `suban-controller` | Price observations, schema/method versions, trust state at observation | Restore backup; history is append-only |
-| `events.db` | `event-indexer` | Contract events + index checkpoints | Restore backup and replay from last checkpoint |
+| `events.db` | `event-indexer` | Normalized ledgers, transactions, operations, accounts, contract events, registry, checkpoints, API-key usage and webhook outbox | Restore backup and replay from last checkpoint |
 | In-memory caches | API/controller | Short-lived read cache | Cold start |
 
 Canonical data contracts (target state):
@@ -170,6 +177,8 @@ Canonical data contracts (target state):
 - `AggregatedPrice` — observation plus provenance, freshness, aggregation method
   and trust snapshot.
 - `Event` — contract, event type, tx hash, ledger, timestamp, payload.
+- `Ledger` / `Transaction` / `Operation` / `Account` — normalized indexed rows
+  with schema version `2.0` and append-only checkpoints.
 - `Quote` / `ExecutionRequest` — later execution phase.
 
 Schemas are versioned independently from implementation languages. Breaking
@@ -186,7 +195,7 @@ Known/target hostnames (owner-managed, not all verified at every revision):
 | Testnet UI | `testnet.suban.org` | Testnet-facing frontend |
 | RPC | `rpc.suban.org` | Public JSON-RPC |
 | Test RPC | `testrpc.suban.org` | Testnet JSON-RPC |
-| Event indexer | internal Compose service | No public hostname assumed |
+| Data platform | `data.suban.org` (target; not yet provisioned) | Indexed historical API; `/metrics` private |
 | Bridge relayer | internal worker | Metrics-only listener `:9464` |
 
 Default ports: controller `3000`, Suban-api `4000`, event indexer `3002`, bridge
@@ -222,10 +231,15 @@ shipped to frontends or public API processes.
 - If the oracle push fails, the observation remains in history and the breaker
   reference does not move.
 - If the indexer misses a range, its checkpoint makes replay deterministic.
+- If the data platform is stale, `/health` returns `503` and every data response
+  carries `freshness.stale=true`; consumers must not present stale rows as live.
+- If a webhook receiver fails, deliveries retry with backoff and remain visible
+  in the outbox; indexed data is not rolled back.
 
 ## 8. Related documents
 
 - [PRODUCTS.md](./PRODUCTS.md) — capability catalog and status.
+- [DATA-PLATFORM.md](./DATA-PLATFORM.md) — indexed schema, API, freshness and replay.
 - [ROADMAP.md](./ROADMAP.md) — phases, gates and exit criteria.
 - [SECURITY.md](./SECURITY.md) — threat model and controls.
 - [OWNERSHIP.md](./OWNERSHIP.md) — module owners and deployment targets.

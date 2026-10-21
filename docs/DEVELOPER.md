@@ -398,6 +398,27 @@ await bridge.unpause(adminKeypair);
 | `GET /api/v1/bridge/config` | GET | Bridge config |
 | `GET /api/v1/bridge/volume` | GET | Volume stats |
 
+### Indexed data platform
+
+Base: `http://localhost:3002`. Historical queries come from SQLite, not live
+Horizon/RPC. Send `x-api-key` when the deployment requires public keys.
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `GET /events?contract=&type=&from=&to=` | GET | Contract events from indexed history |
+| `GET /transactions?account=&ledger=&from=&to=` | GET | Indexed transactions |
+| `GET /operations?account=&tx_hash=&type=` | GET | Indexed operations |
+| `GET /accounts/:accountId` | GET | Account snapshot or activity stub |
+| `GET /accounts/:id/transactions` | GET | Transactions involving an account |
+| `GET /accounts/:id/operations` | GET | Operations involving an account |
+| `GET /ledgers` | GET | Recent indexed ledgers |
+| `GET /contracts` | GET | Contract metadata registry |
+| `GET /status` | GET | Counts, checkpoints and freshness |
+
+Every response includes `schema_version` and `freshness`; check
+`freshness.stale` before treating data as live. A `404` from this API means "not
+indexed", not "not on chain". See [DATA-PLATFORM.md](./DATA-PLATFORM.md).
+
 ---
 
 ## Network Configuration

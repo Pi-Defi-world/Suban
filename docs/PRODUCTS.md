@@ -1,6 +1,6 @@
 # Suban Products and Capabilities
 
-Status: canonical product catalog (Phase 1, October 2026).
+Status: canonical product catalog (Phase 2, October 2026).
 
 This document describes what Suban offers today and what is intentionally not
 yet offered. Status values are:
@@ -36,16 +36,16 @@ yet offered. Status values are:
 | Status | Implemented |
 | Limits | Read-only; no signing. Upstream Horizon availability determines freshness. |
 
-### 1.3 Event indexer
+### 1.3 Data platform (`event-indexer`)
 
 | | |
 |---|---|
-| What | Persistent index of contract events with a query API |
-| For | Explorers, analytics, applications that should not run their own Soroban ingestion |
-| Interface | `/events`, `/events/contract/:id`, `/events/type/:type`, `/events/ledger/:n`, `/stats`, `/status`, `/health`, `/metrics` on `:3002` |
+| What | Versioned index of Pi ledgers, transactions, operations, accounts and Suban contract events with historical query API |
+| For | Explorers, analytics, applications that should not run a Pi node or their own ingestion pipeline |
+| Interface | `/events`, `/transactions`, `/operations`, `/accounts/:id`, `/ledgers`, `/contracts`, `/status`, `/stats`, `/health`, `/metrics` on `:3002` |
 | Repository | `Suban/services/event-indexer` |
-| Status | Implemented |
-| Limits | Derived, replayable view; configured contract list only. Poll counts, last indexed ledger and fetch errors are exposed as metrics. |
+| Status | Implemented and tested; testnet/experimental deployment |
+| Limits | Derived, replayable view. Account balances are snapshots or activity stubs. Public hostname, TLS and production backfill are not yet provisioned. Public keys/quotas and webhooks are implemented. |
 
 ## 2. Market data and oracle products
 

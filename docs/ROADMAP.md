@@ -1,6 +1,6 @@
 # Suban Roadmap
 
-Status: canonical roadmap (Phase 1, October 2026).
+Status: canonical roadmap (Phase 2, October 2026).
 
 Suban is sequenced **risk removal → data → financial products → execution and
 capital**. Later phases are gated by earlier exit criteria; they are not
@@ -10,11 +10,11 @@ calendar promises. The canonical strategy narrative remains
 
 ## 1. Current position
 
-| Phase | Theme | Status (20 Oct 2026) | Exit criterion |
+| Phase | Theme | Status (21 Oct 2026) | Exit criterion |
 |---|---|---|---|
 | 0 | Stabilize and make claims true | **Complete except owner actions** | No known critical defect; CI green; no secrets in the tree |
-| 1 | Consolidate L0/L2 | **In progress** | Docs match code; multi-asset persistent prices; all services have metrics; no contradictions |
-| 2 | Data platform (L1) | Not started | External developer can build an explorer/analytics app using only Suban APIs |
+| 1 | Consolidate L0/L2 | **Complete** | Docs match code; multi-asset persistent prices; all services have metrics; no contradictions |
+| 2 | Data platform (L1) | **Implemented; deployment/owner actions pending** | External developer can build an explorer/analytics app using only Suban APIs |
 | 3 | Financial data and risk (L2) | Not started | At least one application consumes Suban financial data/oracle with freshness/confidence visible |
 | 4 | Execution and controlled capital | Not started | Measurable usage justifies one capital/execution product; audit complete before mainnet capital |
 | 5 | 2027 portfolio selection | Not started | Choose the winning product from evidence |
@@ -55,27 +55,32 @@ destructive git-history purge. Until then Phase 0 is not fully closed.
 - [x] oUSD has no fabricated peg; unconfigured assets return `503`.
 - [x] Four services expose `/metrics`; dashboard JSON validates.
 - [x] Canonical docs exist and are linked from the root README.
-- [ ] Add dependency audit (`npm audit` / `cargo audit`) to CI (carry-over from 0.8).
-- [ ] Add an on-chain testnet integration test for the controller oracle push.
-- [ ] Complete owner secret rotation and history purge.
+- [x] Production dependency audits are blocking in CI; full/dev audits are report-only.
+- [ ] Add an on-chain testnet integration test for the controller oracle push (owner-blocked, see `DEFERRED-OWNER-ACTIONS.md`).
+- [ ] Complete owner secret rotation and history purge (owner-blocked, see `DEFERRED-OWNER-ACTIONS.md`).
 
 ## 4. Phase 2 — Data platform (L1)
 
 **Goal:** developers can consume Pi data without running a node.
 
-| # | Task | Acceptance |
-|---|---|---|
-| 2.1 | Normalize event/account/tx/operation data | Versioned schema + migrations, documented and tested |
-| 2.2 | Expand indexer ingestion | Accounts, transactions, operations, events; replay from checkpoint reproduces state |
-| 2.3 | Indexer operations | Lag, completeness, reorg/replay metrics with dashboard and alert thresholds |
-| 2.4 | Contract metadata registry | Network/address/interface/version/verification; discovery no longer depends on event scans |
-| 2.5 | Public API keys and quotas | Per-key usage visible and enforceable |
-| 2.6 | Webhooks | Subscription + outbox + retries; idempotent delivery |
-| 2.7 | Historical query API | Time-range queries served from indexed data |
-| 2.8 | Freshness guarantees | Freshness/lag fields on every response |
+| # | Task | Status | Evidence |
+|---|---|---|---|
+| 2.1 | Normalize event/account/tx/operation data | **Done** | `services/event-indexer/src/db.ts` versioned schema `2.0` with additive Phase 1 upgrade; migrations tested |
+| 2.2 | Expand indexer ingestion | **Done** | Horizon ledgers/transactions/operations/accounts + Soroban events; checkpointed idempotent replay tested |
+| 2.3 | Indexer operations | **Done** | Lag/completeness/reorg/replay metrics; Grafana panels + Prometheus alert rules |
+| 2.4 | Contract metadata registry | **Done** | `contracts` table + admin API; discovery independent of event scans |
+| 2.5 | Public API keys and quotas | **Done** | SHA-256 keys, minute/day counters, `429` + `Retry-After`, `/admin/api-keys/usage` |
+| 2.6 | Webhooks | **Done** | Durable outbox, HMAC, idempotency key, exponential backoff, delivery state API |
+| 2.7 | Historical query API | **Done** | `/events`, `/transactions`, `/operations`, `/accounts`, `/ledgers`; SQLite-only handlers |
+| 2.8 | Freshness guarantees | **Done** | `schema_version` + `freshness` on every data response; `/health` `503` when stale |
 
 **Exit:** an external developer can build an explorer or analytics app using only
-Suban APIs.
+Suban APIs. Implementation is complete and the route contract is documented in
+[`DATA-PLATFORM.md`](./DATA-PLATFORM.md) and
+[`../services/event-indexer/README.md`](../services/event-indexer/README.md).
+Public deployment (DNS/TLS/backfill/capacity) and the owner actions in
+[`DEFERRED-OWNER-ACTIONS.md`](./DEFERRED-OWNER-ACTIONS.md) remain open; this
+document does not claim a live public data platform.
 
 ## 5. Phase 3 — Financial data and risk (L2)
 

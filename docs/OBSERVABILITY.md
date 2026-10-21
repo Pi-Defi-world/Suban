@@ -1,6 +1,6 @@
 # Suban Observability
 
-Status: canonical observability guide (Phase 1, October 2026).
+Status: canonical observability guide (Phase 2, October 2026).
 
 All four runtime services expose Prometheus metrics and a health endpoint. The
 observability pack in [`ops/observability/`](../ops/observability/) runs
@@ -12,7 +12,7 @@ Prometheus and Grafana with a provisioned **Suban Platform** dashboard.
 |---|---|---|---|
 | Controller | `/metrics` | `/api/v1/health` | `3000` |
 | Data API (`Suban-api`) | `/metrics` | `/health` | `4000` |
-| Event indexer | `/metrics` | `/health` | `3002` |
+| Data platform (`event-indexer`) | `/metrics` | `/health` | `3002` |
 | Bridge relayer | `/metrics` | `/health` | `9464` |
 | RPC | admin metrics | admin health | `8001` admin; `8000` JSON-RPC |
 
@@ -47,19 +47,36 @@ from a private network; do not expose the relayer's `9464` port publicly.
 | `suban_api_horizon_request_duration_seconds` | `method`, `status` | Upstream Horizon duration |
 | `suban_api_process_*`, `suban_api_nodejs_*` | — | Runtime metrics |
 
-### 2.3 Event indexer (`suban_indexer_*`)
+### 2.3 Data platform (`suban_indexer_*`)
 
 | Metric | Labels | Meaning |
 |---|---|---|
-| `suban_indexer_polls_total` | — | Poll cycles |
+| `suban_indexer_polls_total` | - | Poll cycles |
 | `suban_indexer_events_indexed_total` | `contract`, `event_type` | Events written |
-| `suban_indexer_errors_total` | `stage` | Indexer errors (`poll`) |
-| `suban_indexer_fetch_errors_total` | `contract` | RPC fetch errors |
-| `suban_indexer_last_ledger` | `contract` | Last indexed ledger |
-| `suban_indexer_stored_events` | — | Total stored events |
-| `suban_indexer_running` | — | 1 while the poll loop runs |
+| `suban_indexer_ledgers_indexed_total` | - | Horizon ledgers written |
+| `suban_indexer_transactions_indexed_total` | - | Transactions written |
+| `suban_indexer_operations_indexed_total` | - | Operations written |
+| `suban_indexer_accounts_observed_total` | - | Account identifiers observed |
+| `suban_indexer_errors_total` | `stage` | Indexer errors (`events`, `horizon`) |
+| `suban_indexer_fetch_errors_total` | `source` | Upstream fetch errors (`soroban-rpc`, `horizon`, `horizon-account`) |
+| `suban_indexer_last_ledger` | `contract` | Last indexed ledger per contract |
+| `suban_indexer_latest_observed_ledger` | - | Latest ledger observed upstream |
+| `suban_indexer_ingest_lag_ledgers` | - | Observed minus indexed ledger |
+| `suban_indexer_ingest_lag_seconds` | - | Seconds since the last successful poll |
+| `suban_indexer_operation_completeness_ratio` | - | Stored operations / latest ledger operation count |
+| `suban_indexer_reorg_detected_total` | `stream` | Parent-hash mismatches |
+| `suban_indexer_replay_resets_total` | `stream` | Checkpoint resets requested for replay |
+| `suban_indexer_stored_events` | - | Total stored events |
+| `suban_indexer_stored_transactions` | - | Total stored transactions |
+| `suban_indexer_stored_operations` | - | Total stored operations |
+| `suban_indexer_stored_accounts` | - | Total stored accounts |
+| `suban_indexer_running` | - | 1 while the poll loop runs |
+| `suban_indexer_api_key_requests_total` | `key`, `result` | Public API key outcomes (`allowed`, `quota_exceeded`, `unauthorized`) |
+| `suban_indexer_webhook_deliveries_total` | `result` | Webhook outcomes (`delivered`, `retry`, `failed`) |
+| `suban_indexer_webhook_duration_seconds` | `result` | Webhook delivery duration histogram |
+| `suban_indexer_webhook_pending` | - | Deliveries waiting for first attempt or retry |
 | `suban_indexer_http_requests_total` | `method`, `route`, `status` | API requests |
-| `suban_indexer_process_*`, `suban_indexer_nodejs_*` | — | Runtime metrics |
+| `suban_indexer_process_*`, `suban_indexer_nodejs_*` | - | Runtime metrics |
 
 ### 2.4 Bridge relayer (`suban_relayer_*`)
 
@@ -93,7 +110,10 @@ docker compose up -d
 - Dashboard: `grafana/dashboards/suban-platform.json`, UID `suban-platform`.
   Panels cover service up, HTTP rate/5xx, price by asset, trust state, source
   availability, aggregation/push outcomes, indexer polls/ledger/events/errors,
-  relayer events/transfers/last-event age and process memory.
+  ingestion lag, operation completeness, webhook retry/failure pressure, API-key
+  quota pressure, relayer events/transfers/last-event age and process memory.
+- Alert rules: `prometheus/alerts.yml`, loaded by `prometheus.yml`. Thresholds
+  match `DATA-PLATFORM.md` section 5.
 
 The dashboard is provisioned read-only by default; `allowUiUpdates` is enabled
 for local editing. Export changes back to the JSON file if you want them kept.
@@ -136,7 +156,13 @@ deployment.
 | Source down | `suban_source_up == 0` | 10m |
 | HTTP 5xx ratio high | `sum by (job) (rate({__name__=~"suban_(api_|indexer_)?http_requests_total",status=~"5.."}[5m])) / sum by (job) (rate({__name__=~"suban_(api_|indexer_)?http_requests_total"}[5m])) > 0.01` | 10m |
 | Indexer not advancing | `changes(suban_indexer_last_ledger[15m]) == 0 and suban_indexer_running == 1` | 15m |
-| Indexer fetch errors | `increase(suban_indexer_fetch_errors_total[10m]) > 0` | 5m |
+| Indexer ledger lag high | `suban_indexer_ingest_lag_ledgers > 10` | 5m |
+| Indexer stale | `suban_indexer_ingest_lag_seconds > 120` | 5m |
+| Indexer operation completeness low | `suban_indexer_operation_completeness_ratio < 0.99` | 15m |
+| Indexer reorg signal | `increase(suban_indexer_reorg_detected_total[10m]) > 0` | 1m |
+| Indexer fetch errors | `rate(suban_indexer_fetch_errors_total[10m]) > 0.1` | 10m |
+| Webhook failures/retries | `sum(rate(suban_indexer_webhook_deliveries_total{result=~"failed|retry"}[10m])) > 0.05` | 10m |
+| API-key quota pressure | `sum(rate(suban_indexer_api_key_requests_total{result="quota_exceeded"}[10m])) > 1` | 10m |
 | Relayer event starvation | `time() - max(suban_relayer_last_event_timestamp_seconds) > 900 and suban_relayer_running == 1` | 10m |
 | Relayer failures | `increase(suban_relayer_transfers_total{status="failed"}[15m]) > 0` | 5m |
 
@@ -147,7 +173,8 @@ deployment.
 - Controller logs source failures, aggregation outcomes, trust transitions,
   oracle push results and HTTP errors.
 - Relayer logs each observed burn event and each completed/failed transfer.
-- Indexer logs poll errors and per-contract indexed counts.
+- Indexer logs poll errors, reorg signals, webhook delivery failures and account
+  snapshot failures. Event payloads are stored, not logged by default.
 - Distributed tracing is not implemented; use request correlation at the edge
   when added.
 

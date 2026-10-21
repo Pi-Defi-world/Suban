@@ -23,7 +23,7 @@ integrate.
 |---|---|---|
 | Controller | `3000` | Market data/oracle; control routes authenticated |
 | Data API | `4000` | Horizon-compatible reads |
-| Event indexer | `3002` | Indexed contract events |
+| Event indexer / data platform | `3002` | Indexed ledgers, transactions, operations, accounts and contract events; public keys/quotas and webhooks |
 | Bridge relayer | `9464` | Metrics/health only; no public API |
 | RPC | `8000` / `8001` | Public JSON-RPC / private admin |
 | Horizon | `31401` / `41401` | Testnet / mainnet local Horizon |
@@ -54,6 +54,7 @@ Service quick starts live in each service directory:
 | Document | Purpose |
 |---|---|
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Repositories, service boundaries, data flows, trust boundaries |
+| [DATA-PLATFORM.md](docs/DATA-PLATFORM.md) | Indexed schema, historical API, freshness, replay, keys and webhooks |
 | [PRODUCTS.md](docs/PRODUCTS.md) | Capability catalog with status and limits |
 | [ROADMAP.md](docs/ROADMAP.md) | Phases, gates and exit criteria |
 | [SECURITY.md](docs/SECURITY.md) | Threat model, controls, open gaps, reporting |
@@ -68,6 +69,7 @@ Operational runbooks:
 
 - [INCIDENT-RUNBOOK.md](docs/INCIDENT-RUNBOOK.md)
 - [SECRET-ROTATION.md](docs/SECRET-ROTATION.md)
+- [DEFERRED-OWNER-ACTIONS.md](docs/DEFERRED-OWNER-ACTIONS.md)
 - [AUDIT-PROGRAM.md](docs/AUDIT-PROGRAM.md)
 - [PRODUCTION-ROADMAP.md](docs/PRODUCTION-ROADMAP.md)
 - [PHASE2-BRIDGE-DESIGN.md](docs/PHASE2-BRIDGE-DESIGN.md)

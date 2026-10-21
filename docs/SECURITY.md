@@ -1,6 +1,6 @@
 # Suban Security
 
-Status: canonical security model (Phase 1, October 2026).
+Status: canonical security model (Phase 2, October 2026).
 
 Suban handles market data, chain access and value-movement code. This document
 states the threat model, the controls that exist, and the gaps that are still
@@ -75,6 +75,10 @@ Internet ──► public read APIs (controller, API, RPC, indexer)
 | RPC/Horizon abuse | DoS, quota exhaustion | Rate limits, caching, upstream timeouts | Partial |
 | Supply-chain compromise | Malicious dependency/build | Lockfiles, pinned `ed25519-dalek`, `--locked`, `npm ci`, CI build | Partial: production Node audits block high/critical; Rust audit is enabled; dev-only findings are triaged separately |
 | Indexer data loss/corruption | Wrong analytics | SQLite checkpoints, replayable derived view, backups | Partial: backup drill not documented |
+| Public data API key abuse | Quota exhaustion, cost/DoS | Per-key minute/day quotas, hashed keys, `429` + `Retry-After`, usage endpoint | Implemented |
+| Webhook spoofing or replay | False event delivery | HMAC-SHA256 signature over raw body, stable `Idempotency-Key`, retries | Implemented; secret storage is DB-protected |
+| Stale indexed data presented as live | Wrong analytics/decisions | `freshness` on every response, `/health` `503` when stale, lag alerts | Implemented |
+| Public data admin route exposed | Contract/webhook tampering | `INDEXER_ADMIN_API_KEY`, constant-time compare, `503` if unset, private network | Implemented |
 | Oracle push failure | Stale on-chain price | Push only after success; failed push does not move breaker reference; metrics | Implemented |
 | Pause-registry not wired | Inability to stop contracts | Pause registry exists but is not called by value-moving contracts | **Open gap** |
 | Contract bug | Loss of funds | Tests, workspace CI, audit program | **Open gap: no independent audit** |
@@ -106,7 +110,23 @@ Internet ──► public read APIs (controller, API, RPC, indexer)
   implemented; the relayer cannot silently enable it.
 - The relayer's only network listener is `/metrics` + `/health` on `9464`.
 
-### 5.3 Repositories and CI
+### 5.3 Data platform (`event-indexer`)
+
+- Public data routes support per-key quotas; keys are stored as SHA-256 hashes,
+  usage is persisted per key, and exhausted keys receive `429` with
+  `Retry-After: 60`.
+- Admin routes require `INDEXER_ADMIN_API_KEY`; unset returns `503`, never falls
+  open. Admin routes are intended for a private network.
+- Indexed queries read SQLite only. They never proxy live Horizon/RPC calls, so
+  a `404` means "not indexed", not "not on chain".
+- Every data response carries `freshness`; `/health` returns `503` when stale.
+- Webhooks use a durable outbox, unique `(subscription, event)` delivery,
+  HMAC-SHA256 signatures, a stable idempotency key and bounded exponential
+  backoff. Secret values are omitted from list responses.
+- The SQLite database contains webhook signing secrets and API-key usage; treat
+  the file as a secret and restrict filesystem access.
+
+### 5.4 Repositories and CI
 
 - GitHub Actions in all four repositories: Rust workspace build/test, Go
   build/vet/test with a gated preflight package, SDK typecheck/test, service
@@ -124,7 +144,7 @@ Internet ──► public read APIs (controller, API, RPC, indexer)
   and `path-to-regexp`.
 - Controller uses Node 22+ for `better-sqlite3` prebuilt compatibility.
 
-### 5.4 Operations
+### 5.5 Operations
 
 - Caddy/Cloudflare provide TLS at the edge; internal container traffic is HTTP
   and must remain on private networks.
@@ -141,7 +161,9 @@ Internet ──► public read APIs (controller, API, RPC, indexer)
 | No independent audit | Contract bugs may be unknown | Engage auditor; do not deploy mainnet capital | Contracts owner |
 | Pause registry unwired | Cannot globally pause value-moving contracts | Wire pause checks into contracts that need it; test | Contracts owner |
 | Arc→Stellar mint disabled | Bridge direction unavailable | Implement signer authorization entries and tests | Bridge owner |
-| Dependency audit pending | Known-vulnerable dependency may ship | Add `npm audit`/`cargo audit` (or equivalent) to CI | Platform owner |
+| Dependency audit pending | Known-vulnerable dependency may ship | Production Node audits and Rust audit are in CI; triage report-only full/dev findings | Platform owner |
+| Data-platform public deployment not provisioned | No live public endpoint/backfill | DNS/TLS, key policy, private metrics, production backfill and load test | SRE owner |
+| Webhook signing secrets in SQLite | DB read exposes webhook secrets | Restrict file permissions, backup encryption, rotate per subscription | Indexing owner |
 | `suban-rpc` preflight protocol mismatch | Contract-state preflight tests not in the gate | Upgrade host to protocol 25 or keep the documented compatibility limit | RPC owner |
 | Single-sig relayer keys | One key compromise moves funds | Multisig/HSM design before mainnet value | Bridge owner |
 | No backup/restore drill | Data loss after disk failure | Document and test SQLite backups | SRE owner |
@@ -212,7 +234,9 @@ with concrete follow-ups.
 ## 11. Related documents
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — trust boundaries and data flows.
+- [DATA-PLATFORM.md](./DATA-PLATFORM.md) — indexed data security/freshness contract.
 - [SECRET-ROTATION.md](./SECRET-ROTATION.md) — rotation and history purge.
+- [DEFERRED-OWNER-ACTIONS.md](./DEFERRED-OWNER-ACTIONS.md) — owner-blocked follow-ups.
 - [INCIDENT-RUNBOOK.md](./INCIDENT-RUNBOOK.md) — procedures and severity.
 - [AUDIT-PROGRAM.md](./AUDIT-PROGRAM.md) — audit scope.
 - [PRODUCTION-ROADMAP.md](./PRODUCTION-ROADMAP.md) — bridge production gates.

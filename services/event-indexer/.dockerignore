@@ -1,4 +1,10 @@
 node_modules
 dist
+coverage
+test
 *.db
+*.db-*
 *.log
+.env
+.env.*
+README.md

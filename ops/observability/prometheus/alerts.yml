@@ -1,0 +1,65 @@
+groups:
+  - name: suban-data-platform
+    rules:
+      - alert: SubanIndexerLagHigh
+        expr: suban_indexer_ingest_lag_ledgers > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Data platform ledger lag is high"
+          description: "The indexer is more than 10 ledgers behind the observed Horizon tip."
+
+      - alert: SubanIndexerStale
+        expr: suban_indexer_ingest_lag_seconds > 120
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Data platform has not polled successfully"
+          description: "No successful indexer poll for more than 120 seconds. Data responses are stale."
+
+      - alert: SubanIndexerOperationIncomplete
+        expr: suban_indexer_operation_completeness_ratio < 0.99
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Indexed operations are incomplete for the latest ledger"
+          description: "Stored operations divided by the ledger-reported operation count is below 0.99."
+
+      - alert: SubanIndexerReorgSignal
+        expr: increase(suban_indexer_reorg_detected_total[10m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Indexer detected a parent-hash mismatch"
+          description: "A possible reorg was detected. Replay from a known-good checkpoint and investigate."
+
+      - alert: SubanIndexerFetchErrors
+        expr: rate(suban_indexer_fetch_errors_total[10m]) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Data platform upstream fetch errors"
+          description: "Horizon or Soroban RPC fetch errors are elevated."
+
+      - alert: SubanWebhookDeliveryPressure
+        expr: sum(rate(suban_indexer_webhook_deliveries_total{result=~"failed|retry"}[10m])) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Webhook retries or failures are elevated"
+          description: "Check receiver availability and the pending webhook outbox."
+
+      - alert: SubanApiKeyQuotaPressure
+        expr: sum(rate(suban_indexer_api_key_requests_total{result="quota_exceeded"}[10m])) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API-key quota is being exhausted"
+          description: "A consumer is repeatedly hitting its minute or day quota."
