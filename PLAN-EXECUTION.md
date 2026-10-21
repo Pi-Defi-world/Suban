@@ -516,6 +516,18 @@ Phase 4 remains gated by these gaps; no execution/capital work is claimed.
 
 **Gate before starting:** data platform stable, oracle reliable, at least one consumer, no P0/P1 defects open.
 
+**Status (21 October 2026): not started.** Gate assessment:
+
+| Gate item | State |
+|---|---|
+| Data platform stable | Partial: Phase 2 routes/tests pass; public deployment, backfill and capacity are owner actions. |
+| Oracle reliable | Partial: trust states/history are implemented; on-chain push integration test and real consumer are missing. |
+| At least one consumer | Not met. |
+| No open P0/P1 defects | Not met: secret rotation and git-history purge are owner-blocked; bridge mint authorization remains gated. |
+
+No quote service, vault, liquidation bot or capital work has started. The
+Phase 4 table below is a plan, not a claim of implementation.
+
 | # | Task | Deliverable | Acceptance criteria |
 |---|---|---|---|
 | 4.1 | Quote service | `/quote` using existing swap contracts | Matches on-chain simulation within tolerance |
@@ -531,6 +543,9 @@ Phase 4 remains gated by these gaps; no execution/capital work is claimed.
 ---
 
 ### Phase 5 — 2027 roadmap (per plan Sections 16–17)
+
+Status: **not started**. It depends on the Phase 3 consumer/exit and the Phase 4
+gate, neither of which is met.
 
 - Q1 2027: Data Platform exit.
 - Q2 2027: Financial Data + Risk exit.

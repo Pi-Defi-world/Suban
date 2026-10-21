@@ -119,6 +119,10 @@ remains gated.
 **Gate:** Phase 3 exit met, data platform stable, oracle reliable, at least one
 consumer, no open P0/P1 defects.
 
+Status: **not started (21 Oct 2026)**. The Phase 3 consumer/exit is unmet, public
+data-platform deployment and backfill are owner actions, and owner-blocked
+security items remain. No quote, vault, liquidation or capital work is claimed.
+
 | # | Task | Acceptance |
 |---|---|---|
 | 4.1 | Quote service | Matches on-chain simulation within tolerance |
@@ -132,7 +136,9 @@ consumer, no open P0/P1 defects.
 **Exit:** measurable usage justifies one capital/execution product; audit
 complete before any mainnet capital.
 
-## 7. Phase 5 — 2027 portfolio selection
+## 7. Phase 5 - 2027 portfolio selection
+
+Status: **not started**. It depends on the unmet Phase 3 exit and Phase 4 gate.
 
 | Quarter | Focus |
 |---|---|
