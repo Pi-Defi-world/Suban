@@ -508,6 +508,16 @@ implemented and tested; the consumer/exit criterion is not met.
 
 Phase 4 remains gated by these gaps; no execution/capital work is claimed.
 
+**Verification (21 October 2026):**
+
+- `suban-controller`: `tsc` build passes; 43 Jest tests pass on Node 22 Docker.
+- `event-indexer`: `tsc --noEmit` passes; 15 Vitest tests pass on Node 22 Docker.
+- Live controller smoke test: `/api/v1/methodology` and `/api/v1/risk/methods` return `200`; `/api/v1/statistics` returns `503` with an empty history database; unknown assets return `404` and malformed risk bodies return `400`.
+- CI: `suban-controller` run `39612289467` succeeded; `Suban` run `39611859646` succeeded.
+
+No USD volume, LP position, on-chain lending position or consumer usage is
+claimed.
+
 ---
 
 ### Phase 4 — Execution and controlled capital (Week 18–25)
