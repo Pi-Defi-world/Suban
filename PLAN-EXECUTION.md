@@ -517,7 +517,7 @@ public routes. The production consumer/exit criterion is not met.
 - Test-user consumer: 3 Node contract tests pass; a live run against the rebuilt controller and indexer returned `status: ok` with 5/5 checks (price provenance, TWAP, risk, financial summary, financial pools). The report records `coverage.lp_positions=false` and `coverage.usd_volume=false` rather than inventing them.
 - SDK quote preview: `tsc --noEmit` passes; 20 Vitest tests pass, including 6 deterministic CPMM quote/wiring tests.
 - Live controller smoke test: `/api/v1/methodology` and `/api/v1/risk/methods` return `200`; `/api/v1/statistics` returns `503` with an empty history database; a future `as_of` returns `400`; unknown assets return `404` and malformed risk bodies return `400`.
-- CI: `suban-controller` run `39615138136` succeeded; `Suban` run `39614942129` succeeded.
+- CI: `suban-controller` run `39615138136` succeeded; `Suban` run `39621991705` succeeded, including the new `Test consumer` job and SDK quote tests.
 
 No USD volume, LP position, on-chain lending position or production consumer
 usage is claimed.
