@@ -513,7 +513,7 @@ Phase 4 remains gated by these gaps; no execution/capital work is claimed.
 - `suban-controller`: `tsc` build passes; 43 Jest tests pass on Node 22 Docker.
 - `event-indexer`: `tsc --noEmit` passes; 15 Vitest tests pass on Node 22 Docker.
 - Live controller smoke test: `/api/v1/methodology` and `/api/v1/risk/methods` return `200`; `/api/v1/statistics` returns `503` with an empty history database; a future `as_of` returns `400`; unknown assets return `404` and malformed risk bodies return `400`.
-- CI: `suban-controller` run `39613279992` succeeded; `Suban` run `39612951890` succeeded.
+- CI: `suban-controller` run `39615138136` succeeded; `Suban` run `39614942129` succeeded.
 
 No USD volume, LP position, on-chain lending position or consumer usage is
 claimed.
