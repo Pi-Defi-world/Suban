@@ -128,18 +128,19 @@ to a preview under an explicit gate override.
 **Gate:** Phase 3 exit met, data platform stable, oracle reliable, at least one
 consumer, no open P0/P1 defects.
 
-Status: **preview started (22 Oct 2026) under an explicit owner-requested gate
+Status: **preview (23 Oct 2026) under an explicit owner-requested gate
 override**. The owner asked to use an internal test user instead of waiting for
 an external consumer and to skip owner-only actions. This does not satisfy the
-gate and does not authorize capital. The deterministic SDK and HTTP CPMM quote
-previews exist; no route discovery, on-chain parity, vault, liquidation or
-capital work is claimed.
+gate and does not authorize capital. Deterministic SDK/HTTP CPMM previews,
+read-only deployed `get_quote` simulation and CPMM route discovery exist;
+deployed parity was verified in both directions on 23 Oct 2026. No vault,
+liquidation or capital work is claimed.
 
 | # | Task | Acceptance |
 |---|---|---|
-| 4.1 | Quote service | Deterministic SDK/HTTP CPMM previews plus a contract-level `get_quote` vector test; deployed simulation parity and route discovery still missing |
-| 4.2 | Simulation API | Reproducible price impact in SDK/HTTP; RPC preflight simulation still missing |
-| 4.3 | Route discovery | Only across real liquidity; no synthetic venues |
+| 4.1 | Quote service | Deterministic SDK/HTTP CPMM previews, a contract-level `get_quote` vector and deployed Pi testnet parity in both directions |
+| 4.2 | Simulation API | Read-only deployed `get_quote` simulation with reproducible price impact and a parity flag; no transaction building |
+| 4.3 | Route discovery | 1–3 hop CPMM routes over enriched indexed liquidity only; no synthetic venues or stableswap hops |
 | 4.4 | Vault framework (testnet) | Caps, pause, strategy isolation; deposit/withdraw/pause tests pass |
 | 4.5 | Lending hardening | Oracle integration and liquidation tests end-to-end |
 | 4.6 | Liquidation bot prototype | Detects and executes a test liquidation on testnet |

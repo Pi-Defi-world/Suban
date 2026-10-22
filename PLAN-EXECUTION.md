@@ -24,7 +24,7 @@ In plain terms:
 
 **Recommendation:** do **not** start Q2–Q4 2027 execution/capital work yet. Run a 90-day "Consolidate" phase first: correctness, security, data persistence, observability, CI, and documentation. The platform's credibility depends on the controller and data layer being trustworthy, not on shipping more contracts.
 
-**Update (22 October 2026):** Phase 0-2 are complete. Phase 3 remains **partial**, but the documented data gaps are now addressed in code: CPMM/stableswap events carry token addresses, post-event reserves and share totals; lending-pool emits deposit/withdraw/borrow/repay/collateral/liquidation/accrual events with position snapshots; the indexer derives LP positions and lending positions; and an opt-in valuation route refuses stale or degraded prices. An internal **test-user consumer** exercises price provenance, TWAP, risk and financial coverage end-to-end, so the consumer mechanics are demonstrated; production adoption, deployment of the enriched contracts and measured external usage are still absent. Phase 4 has started as a **CPMM quote preview** under an explicit owner-requested gate override; no execution or capital work is claimed.
+**Update (23 October 2026):** Phase 0-2 are complete. Phase 3 remains **partial**, but the documented data gaps are now addressed in code: CPMM/stableswap events carry token addresses, post-event reserves and share totals; lending-pool emits deposit/withdraw/borrow/repay/collateral/liquidation/accrual events with position snapshots; the indexer derives LP positions and lending positions; pool lists expose enriched state for route discovery; and an opt-in valuation route refuses stale or degraded prices. An internal **test-user consumer** exercises price provenance, TWAP, risk and financial coverage end-to-end, so the consumer mechanics are demonstrated; production adoption, deployment of the enriched contracts and measured external usage are still absent. Phase 4 has started as a **CPMM quote preview** under an explicit owner-requested gate override: formula parity is now verified against the deployed Pi testnet pool in both directions, and 1–3 hop CPMM route discovery plus a read-only simulation endpoint exist. No execution or capital work is claimed.
 
 ---
 
@@ -78,7 +78,7 @@ In plain terms:
 | 8.1 Financial data | 🟡 | Pools, trades, liquidity events, LP positions and lending positions are projected from enriched events; USD valuation is opt-in and refuses stale/degraded prices. An internal test-user consumer exists but production usage is absent. |
 | 8.2 Oracle extension | 🟡 | TWAP/volatility, persistent series, provenance and freshness exist; liquidity-aware pricing is not implemented and is marked false. |
 | 8.3 Risk engine | 🟡 | Shared deterministic risk module and `/risk/*` API exist. An opt-in indexed route reads lending position snapshots from the data platform and labels its source and ledger. |
-| 8.4 Execution | ❌ | RPC simulation and SDK swap methods exist; deterministic CPMM previews exist in the SDK and over HTTP (`POST /quote/cpmm`, indexed-state `GET /quote/cpmm/:id`). A contract-unit vector matches the real `get_quote`; route discovery and deployed simulation parity are not implemented. |
+| 8.4 Execution | ❌ | RPC simulation and SDK swap methods exist; deterministic CPMM previews exist in the SDK and over HTTP (`POST /quote/cpmm`, indexed-state `GET /quote/cpmm/:id`, simulated `GET /quote/cpmm/:id/onchain`). Deployed Pi testnet `get_quote` parity passes in both directions and CPMM route discovery exists; execution, vaults and capital are not implemented. |
 | 8.5 Controller-to-financial integration | 🟡 | Versioned price/statistics/risk contracts and financial event projections exist; an internal test-user consumer exercises them and records coverage/freshness; production usage measurement is still absent. |
 | 8.6 Data quality model | 🟡 | Responses carry price/confidence/sources/freshness/trust and versioned methods; not the full plan metadata model. |
 | 8.7 Oracle trust model | ✅ | Explicit HEALTHY/DEGRADED/BREAKER/RECOVERY state machine with transition history. |
@@ -516,15 +516,17 @@ contracts still need deployment and live indexing.
 - Rust workspace: `cargo test --workspace` passes; the targeted CPMM,
   stableswap and lending-pool run contributes 32 passing tests, including new
   event-payload, health-factor and shared quote-vector tests.
-- `suban-controller`: `tsc` build passes; 49 Jest tests pass on Node 22 Docker,
-  including the data-platform client and CPMM quote tests.
+- `suban-controller`: `tsc` build passes; 56 Jest tests pass on Node 22 Docker,
+  including the data-platform client, CPMM quote and route-discovery tests.
 - `event-indexer`: `tsc` build passes; 17 Vitest tests pass on Node 22 Docker,
-  including enriched pool, LP-position, lending-position, fresh-price valuation
-  and stale/degraded `503` checks.
+  including enriched pool, pool-list state, LP-position, lending-position,
+  fresh-price valuation and stale/degraded `503` checks.
 - Test-user consumer: 3 Node contract tests pass; the coverage check now accepts
-  supported LP positions and an explicit boolean USD-valuation flag.
+  supported LP positions, route discovery and an explicit boolean USD-valuation
+  flag.
 - SDK quote preview: `tsc --noEmit` passes; 20 Vitest tests pass, including 6
-  deterministic CPMM quote/wiring tests.
+  deterministic CPMM quote/wiring tests. The deployed parity script matches the
+  live Pi testnet pool in both directions (see Phase 4 verification).
 - CI: `suban-controller` run `39800234342` and `Suban` runs `39800235670` and
   `39802054351` succeeded, including SDK, contracts, indexer, consumer, secret
   scan and security audit jobs.
@@ -540,7 +542,7 @@ series or capital/execution usage is claimed.
 
 **Gate before starting:** data platform stable, oracle reliable, at least one consumer, no P0/P1 defects open.
 
-**Status (22 October 2026): preview started under an explicit owner-requested gate override.** The owner directed execution to continue without waiting for owner-only actions and to use an internal test user instead of a real consumer. This does **not** satisfy the Phase 4 gate and does **not** authorize capital. The SDK and HTTP CPMM quote preview are implemented; no execution, route discovery, vault, liquidation or capital work is claimed.
+**Status (23 October 2026): preview, with 4.1/4.2 formula parity verified against the deployed Pi testnet pool and 4.3 CPMM route discovery implemented.** The owner directed execution to continue without waiting for owner-only actions and to use an internal test user instead of a real consumer. This does **not** satisfy the Phase 4 gate and does **not** authorize capital. The SDK and HTTP CPMM quote preview, the read-only on-chain simulation endpoint and 1–3 hop CPMM route discovery are implemented; no execution, vault, liquidation or capital work is claimed.
 
 | Gate item | State |
 |---|---|
@@ -549,23 +551,43 @@ series or capital/execution usage is claimed.
 | At least one consumer | Internal test user exists and passes live checks; production/external consumer is still absent. |
 | No open P0/P1 defects | Not met: secret rotation and git-history purge are owner-blocked; bridge mint authorization remains gated. |
 
-The Phase 4 table below remains the plan. The SDK and HTTP quote previews are a
-partial implementation of 4.1/4.2 only. The HTTP service is deterministic over
-caller-supplied reserves or indexed pool state. A contract unit test confirms
-`get_quote` matches the shared 996-output preview vector, but a deployed testnet
-simulation parity check is still missing.
+The Phase 4 table below remains the plan. The SDK and HTTP quote previews, the
+read-only simulation endpoint and CPMM route discovery are a partial
+implementation of 4.1–4.3. The HTTP previews are deterministic over
+caller-supplied reserves or indexed pool state. `sdk/scripts/quote-parity.mjs`
+and the controller simulation service matched the deployed Pi testnet pool
+`CBE7DHJDS6HZHVY7AWU42XDUA3WAG7GRFAEYEBRM5J3XG2KUYDBAO2NZ` in both directions
+at ledger 27305287/27305295 (998992 and 995011 raw units). That is point-in-time
+formula parity, not an execution guarantee, and the enriched contracts in this
+repository are still not deployed.
 
 | # | Task | Deliverable | Acceptance criteria |
 |---|---|---|---|
-| 4.1 | Quote service | Preview in SDK `quoteCpmm`, `CpmmPoolClient.getQuote`, `POST /api/v1/quote/cpmm`, and indexed-state `GET /api/v1/quote/cpmm/:contractId` | Deterministic integer formula and contract-level `get_quote` vector tested; deployed simulation parity and route discovery still missing |
-| 4.2 | Simulation API | Preview: deterministic CPMM price impact in SDK and HTTP responses | Reproducible results; RPC preflight simulation not yet built |
-| 4.3 | Route discovery | Only across real liquidity | No synthetic venues |
+| 4.1 | Quote service | SDK `quoteCpmm`, `CpmmPoolClient.getQuote`, `POST /api/v1/quote/cpmm`, indexed `GET /api/v1/quote/cpmm/:contractId`, and simulated `GET /api/v1/quote/cpmm/:contractId/onchain` | Deterministic integer formula, contract unit vector and deployed `get_quote` parity in both directions pass; execution-time state guarantees are still absent |
+| 4.2 | Simulation API | Read-only `get_quote` simulation plus deterministic price impact | Reproducible result and parity flag; not wired to transaction building |
+| 4.3 | Route discovery | `GET /api/v1/route/cpmm` over enriched indexed CPMM pools, 1–3 hops | Only real indexed liquidity; stableswap and unenriched pools excluded; `404` when no route exists |
 | 4.4 | Vault framework (testnet) | Caps, pause, strategy isolation | Deposit/withdraw/pause tests pass |
 | 4.5 | Lending hardening | Oracle integration, liquidation tests | Liquidation path tested end-to-end |
 | 4.6 | Liquidation bot prototype | Monitor + execute on testnet | Detects and executes a test liquidation |
 | 4.7 | Audit prep | Scope, threat model, test evidence | Auditor engaged |
 
 **Exit criterion:** measurable usage/economic activity justifies one capital/execution product; audit complete before mainnet capital.
+
+**Verification (23 October 2026):**
+
+- `sdk/scripts/quote-parity.mjs` simulated the deployed Pi testnet CPMM pool in
+  both directions: wPi→USDC preview/on-chain `998992`, USDC→wPi `995011`, at
+  ledger `27305287`. The controller's `simulateCpmmQuote` service reproduced the
+  same pair at ledger `27305295`.
+- Controller build passes; 56 Jest tests pass on Node 22 Docker, including 5
+  route-discovery tests and the enriched pool-list parsing test.
+- Indexer build passes; 17 Vitest tests pass on Node 22 Docker.
+- Route discovery consumes `GET /financial/pools` state and excludes
+  stableswap/unenriched pools; it returns `404` rather than a synthetic route.
+
+**Still missing:** stableswap quoting, execution/transaction building, vaults,
+lending liquidation hardening, a liquidation bot, audit engagement and any
+capital. 4.4–4.7 are not started.
 
 ---
 

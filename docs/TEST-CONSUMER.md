@@ -13,9 +13,10 @@ app. It does not satisfy the Phase 3 production-consumer claim.
    version. A non-200 is reported as unavailable, never filled in.
 3. `POST /api/v1/risk/lending` with test collateral/debt - versioned risk result
    and data-quality status. A non-200 is reported as unavailable.
-4. `GET /financial/summary` - counts plus supported `lp_positions` and explicit
-   boolean `usd_volume` coverage flags.
-5. `GET /financial/pools` - pool list plus the same coverage flags.
+4. `GET /financial/summary` - counts plus `lp_positions` and `route_discovery`
+   support flags and an explicit boolean `usd_volume` flag.
+5. `GET /financial/pools` - pool list, enriched pool state and the same coverage
+   flags.
 
 It sends `x-suban-consumer: test-user-v1` on every request. If `SUBAN_API_KEY`
 is set, it also sends `x-api-key` so API-key usage metering applies.

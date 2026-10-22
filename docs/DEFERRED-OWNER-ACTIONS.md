@@ -172,9 +172,10 @@ records freshness/confidence/coverage; it is not production adoption. The
 contract and indexer code now supports enriched pool/lending events, derived LP
 positions, opt-in USD valuation and indexed risk reads, but live deployment and
 production adoption are not claimed. Phase 3 is **not complete**. Phase 4 is
-limited to SDK/HTTP CPMM quote previews under an explicit gate override; there
-is no deployed `get_quote` simulation parity or route discovery; the contract
-unit vector is not a substitute for a deployed testnet comparison.
+limited to CPMM quote/simulation previews and CPMM route discovery under an
+explicit gate override; deployed `get_quote` parity was verified against the
+existing Pi testnet pool on 23 October 2026, but the enriched contracts are not
+deployed and no execution or capital work exists.
 
 ---
 

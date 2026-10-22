@@ -215,6 +215,26 @@ enriched pool state from the data platform. It returns the source ledger in
 `data_quality.as_of` and refuses pools without token/reserve/fee metadata. It is
 still a preview over indexed state, not a live `get_quote` simulation.
 
+`GET /api/v1/quote/cpmm/:contractId/onchain?token_in=...&amount_in=...` calls the
+deployed contract's `get_quote` view through Soroban simulation and compares the
+result with the same deterministic formula. It requires
+`QUOTE_SIMULATION_SOURCE_ACCOUNT` (an existing account used only as the
+simulation source; nothing is signed or submitted). The response is
+`data_quality.status: "simulated"` and includes `on_chain`, `parity` and the
+source ledger. A mismatch is returned as `status: "mismatch"` with a warning.
+
+`GET /api/v1/route/cpmm?token_in=...&token_out=...&amount_in=...[&max_hops=2]`
+discovers the best CPMM route over **indexed** pools only. It considers pools
+that have enriched token/reserve/fee state, excludes stableswap hops, and
+returns `404` when no real indexed route exists. `max_hops` is 1–3. Every hop
+reports its pool, reserves, fee and per-hop integer quote; `sources` reports each
+hop's indexer ledger and observation time. Amounts are raw token units. The
+route is a preview over indexed state and can lag the chain.
+
+`Suban/sdk/scripts/quote-parity.mjs` is the reproducible deployed-parity check:
+it reads a pool's tokens/reserves/fee, simulates `get_quote` in both directions
+and exits non-zero on any mismatch. See `docs/PHASE4-QUOTE-PREVIEW.md`.
+
 ### 4.4 `GET /api/v1/trust?asset=PI`
 
 Returns the current trust state and transition history. `?limit=` bounds history

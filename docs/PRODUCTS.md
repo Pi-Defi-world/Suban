@@ -110,10 +110,10 @@ yet offered. Status values are:
 |---|---|
 | What | Deterministic constant-product quote and price-impact preview in the SDK and over HTTP |
 | For | Integrators prototyping swap UX without building a router |
-| Interface | SDK `quoteCpmm` / `CpmmPoolClient.getQuote`; `POST /api/v1/quote/cpmm`; `GET /api/v1/quote/cpmm/:contractId` |
+| Interface | SDK `quoteCpmm` / `CpmmPoolClient.getQuote`; `POST /api/v1/quote/cpmm`; `GET /api/v1/quote/cpmm/:contractId`; `GET /api/v1/quote/cpmm/:contractId/onchain`; `GET /api/v1/route/cpmm` |
 | Repository | `Suban/sdk`, `suban-controller` |
 | Status | Preview only; Phase 4 gate not met |
-| Limits | Caller-supplied reserves or indexed pool state; no route discovery, no deployed `get_quote` parity test (only a contract-unit vector), no stableswap quote, and no execution or transaction construction. Indexed state can lag the chain. |
+| Limits | Caller-supplied reserves, indexed pool state or a read-only deployed `get_quote` simulation. Deployed parity is point-in-time; there is no stableswap quote, no execution or transaction construction, and no capital. Indexed state can lag the chain, and route discovery excludes unenriched pools. |
 
 ## 3. Value-movement products
 

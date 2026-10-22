@@ -9,7 +9,8 @@
     "build": "tsc",
     "test": "vitest run",
     "lint": "eslint src/",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "parity:testnet": "node scripts/quote-parity.mjs"
   },
   "dependencies": {
     "@stellar/stellar-sdk": "^17.2.1"

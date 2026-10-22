@@ -241,6 +241,7 @@ export async function runConsumer({
       finiteNumber(body.counts.add_liquidity) &&
       finiteNumber(body.counts.remove_liquidity) &&
       body.coverage?.lp_positions === true &&
+      body.coverage?.route_discovery === true &&
       typeof body.coverage?.usd_volume === 'boolean';
     checks.push(
       check(

@@ -453,6 +453,26 @@ function latestPoolState(events: PoolEvent[]) {
   return latest ? { ...latest, fee_bps: feeBps, amplification } : null;
 }
 
+function poolStateForContract(
+  db: Database.Database,
+  contractId: string,
+  placeholders: string
+) {
+  const rows = db
+    .prepare(
+      `SELECT event_type, data, timestamp, ledger
+         FROM events
+        WHERE contract_id = ? AND event_type IN (${placeholders})
+        ORDER BY timestamp DESC, id DESC
+        LIMIT 200`
+    )
+    .all(contractId, ...FINANCIAL_EVENT_TYPES) as JsonObject[];
+  const events = rows
+    .map(parseFinancialEvent)
+    .filter((event): event is PoolEvent => event !== null);
+  return latestPoolState(events);
+}
+
 function lpPositions(events: PoolEvent[], limit = 100) {
   const shares = new Map<string, bigint>();
   let latestTotal: bigint | null = null;
@@ -691,9 +711,13 @@ export function createFinancialRouter(
     }
 
     const all = [...pools.values()];
+    const pageItems = all.slice(offset, offset + limit).map((pool) => ({
+      ...pool,
+      state: poolStateForContract(db, pool.contract_id, placeholders),
+    }));
     res.json(
       payload({
-        data: all.slice(offset, offset + limit),
+        data: pageItems,
         pagination: pagination(limit, offset, all.length),
         coverage: {
           trades: true,
@@ -703,9 +727,10 @@ export function createFinancialRouter(
           pool_reserves: true,
           lp_positions: true,
           usd_volume: valuationConfigured,
+          route_discovery: true,
           reason: valuationConfigured
-            ? 'USD valuation is available per pool through /financial/pools/:contractId/valuation.'
-            : 'Set INDEXER_PRICE_API_URL, INDEXER_TOKEN_ASSETS and INDEXER_TOKEN_DECIMALS to enable USD valuation.',
+            ? 'USD valuation is available per pool through /financial/pools/:contractId/valuation. Pool state is derived from enriched events for route discovery.'
+            : 'Set INDEXER_PRICE_API_URL, INDEXER_TOKEN_ASSETS and INDEXER_TOKEN_DECIMALS to enable USD valuation. Pool state is derived from enriched events for route discovery.',
         },
       })
     );
@@ -1141,6 +1166,7 @@ export function createFinancialRouter(
           usd_volume: valuationConfigured,
           lending_events: true,
           lending_positions: true,
+          route_discovery: true,
           note: valuationConfigured
             ? 'USD valuation is opt-in per pool and refuses stale/degraded prices.'
             : 'USD valuation requires INDEXER_PRICE_API_URL, INDEXER_TOKEN_ASSETS and INDEXER_TOKEN_DECIMALS.',

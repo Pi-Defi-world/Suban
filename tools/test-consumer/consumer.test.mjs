@@ -52,14 +52,14 @@ function healthyMock() {
     if (text.includes('/financial/summary')) {
       return json({
         counts: { swap: 4, add_liquidity: 2, remove_liquidity: 1 },
-        coverage: { usd_volume: false, lp_positions: true },
+        coverage: { usd_volume: false, lp_positions: true, route_discovery: true },
         last_event_at: '2026-10-21T00:00:00.000Z',
       });
     }
     if (text.includes('/financial/pools')) {
       return json({
         data: [{ contract_id: 'CPOOL', pool_kind: 'cpmm' }],
-        coverage: { usd_volume: false, lp_positions: true },
+        coverage: { usd_volume: false, lp_positions: true, route_discovery: true },
       });
     }
     return json({ error: 'unexpected route' }, 404);

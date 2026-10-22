@@ -229,6 +229,19 @@ describe('financial data projections', () => {
       shares_raw: '1025',
     });
 
+    // Route discovery reads the same enriched state from the pool list, so a
+    // caller does not have to issue one request per discovered pool.
+    const list = await (await fetch(`${base}/financial/pools`)).json();
+    expect(list.data[0].state).toMatchObject({
+      token_a: TOKEN_A,
+      token_b: TOKEN_B,
+      reserve_a_raw: '10000',
+      reserve_b_raw: '10000',
+      fee_bps: 30,
+      ledger: 104,
+    });
+    expect(list.coverage.route_discovery).toBe(true);
+
     const position = await (
       await fetch(`${base}/financial/lending/accounts/${ACCOUNT}`)
     ).json();

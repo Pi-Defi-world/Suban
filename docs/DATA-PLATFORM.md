@@ -106,7 +106,7 @@ Routes:
 | `GET /accounts/:id` | `accounts` | Stub or full snapshot |
 | `GET /accounts/:id/transactions` | join | Account involvement index |
 | `GET /accounts/:id/operations` | join | Account involvement index |
-| `GET /financial/pools` and `/financial/pools/:id` | `events` | Pool activity, latest reserves, token direction and derived LP positions |
+| `GET /financial/pools` and `/financial/pools/:id` | `events` | Pool activity plus enriched `state` (tokens, reserves, shares, fee) for route discovery |
 | `GET /financial/pools/:id/trades` | `events` | Swap amounts, token direction and post-trade reserves; USD value is opt-in |
 | `GET /financial/pools/:id/liquidity` | `events` | Add/remove-liquidity events with share totals |
 | `GET /financial/pools/:id/lp-positions` | `events` | Net LP shares derived from add/remove events |
@@ -142,6 +142,10 @@ They remain deliberately conservative:
   does not backfill a historical USD-volume series.
 - Legacy events without the enriched tuple remain readable but report missing
   direction/reserves/LP state rather than inferring them.
+- `GET /financial/pools` includes the same `state` object per pool so a
+  controller can discover routes without one request per pool. Pools without an
+  enriched event return `state: null`; they are never filled with guessed
+  reserves. `coverage.route_discovery` reports this capability explicitly.
 - `GET /financial/accounts/:id/activity` scans at most the 5,000 most recent
   financial events because the account is encoded in topic XDR.
 - Lending-account lookup scans at most the 10,000 most recent lending events.
