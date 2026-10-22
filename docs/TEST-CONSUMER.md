@@ -13,8 +13,8 @@ app. It does not satisfy the Phase 3 production-consumer claim.
    version. A non-200 is reported as unavailable, never filled in.
 3. `POST /api/v1/risk/lending` with test collateral/debt - versioned risk result
    and data-quality status. A non-200 is reported as unavailable.
-4. `GET /financial/summary` - counts plus explicit `usd_volume=false` and
-   `lp_positions=false` coverage flags.
+4. `GET /financial/summary` - counts plus supported `lp_positions` and explicit
+   boolean `usd_volume` coverage flags.
 5. `GET /financial/pools` - pool list plus the same coverage flags.
 
 It sends `x-suban-consumer: test-user-v1` on every request. If `SUBAN_API_KEY`
@@ -43,18 +43,21 @@ failures), and for `degraded` only in strict mode.
 
 The report has `schema_version: consumer_report_v1`, a `consumer` block, the
 target URLs, `status` (`ok`, `degraded` or `failed`), per-check results, observed
-facts and warnings. It records explicit coverage limits instead of inventing USD
-volume or LP positions.
+facts and warnings. It records explicit coverage flags instead of inventing USD
+values; LP positions are accepted only when the indexer derives them.
 
 ## Verification
 
 - Node contract tests: `node --test tools/test-consumer/consumer.test.mjs`
   (3 tests: healthy, degraded, malformed).
 - CI job `Test consumer` runs those tests on Node 22.
-- Live run on 21 October 2026 against the rebuilt controller and indexer:
+- Live run on 21 October 2026 against the previous controller/indexer:
   `status: ok`, 5/5 checks. The report showed `sample_count: 1`,
   `annualized_volatility: null`, `coverage.lp_positions: false` and
   `coverage.usd_volume: false`.
+- On 22 October 2026 the consumer contract was updated to accept derived LP
+  positions and an explicit boolean USD-valuation flag. It must be rerun against
+  a deployment of the enriched contracts before claiming live adoption.
 
 ## Limits
 

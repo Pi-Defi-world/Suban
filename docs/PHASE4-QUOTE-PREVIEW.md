@@ -1,8 +1,7 @@
 # Phase 4 Quote Preview
 
-Status: **preview only (21 October 2026)**. This does not satisfy the Phase 4
-gate, does not expose a deployed `/quote` HTTP service, and has not been matched
-against on-chain simulation yet.
+Status: **preview only (22 October 2026)**. This does not satisfy the Phase 4
+gate and has not been matched against on-chain simulation yet.
 
 ## What exists
 
@@ -11,6 +10,10 @@ against on-chain simulation yet.
   `get_quote` view through Soroban simulation.
 - `sdk/tests/quote.test.ts` covers the integer formula, price impact, dust
   rounding, validation and the `get_quote` wiring.
+- `suban-controller` exposes `POST /api/v1/quote/cpmm` for caller-supplied
+  reserves and `GET /api/v1/quote/cpmm/:contractId?token_in=...&amount_in=...`
+  for the latest indexed pool state. Both label themselves as previews.
+- `suban-controller/src/services/quote.test.ts` covers the HTTP formula inputs.
 
 ## Formula
 
@@ -46,12 +49,32 @@ const preview = quoteCpmm({
 // Prefer the on-chain view for execution-time state:
 const pool = new CpmmPoolClient(client, poolContractId);
 const amountOut = await pool.getQuote(tokenAddress, '1000');
+
+// HTTP preview over caller-supplied reserves:
+await fetch('http://localhost:3000/api/v1/quote/cpmm', {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({
+    reserve_in: '1000000',
+    reserve_out: '1000000',
+    amount_in: '1000',
+    fee_bps: 30,
+  }),
+});
+
+// HTTP preview over indexed pool state. Requires DATA_PLATFORM_URL on the
+// controller and an enriched pool event with token/reserve metadata.
+await fetch(
+  'http://localhost:3000/api/v1/quote/cpmm/CPOOL?token_in=CTOKEN&amount_in=1000'
+);
 ```
 
 ## Explicit limits
 
-- **No route discovery.** The caller supplies the pool, direction and reserves.
-- **No HTTP endpoint.** Phase 4.1's `/quote` service is not built.
+- **No route discovery.** The caller supplies the pool, direction and reserves,
+  or a single indexed pool is named explicitly.
+- **Indexed state can lag.** `GET /quote/cpmm/:contractId` returns the source
+  ledger and refuses pools without enriched token/reserve/fee events.
 - **No on-chain parity test.** The pure formula matches the contract source and
   the unit vectors, but it has not been compared with a deployed `get_quote`
   simulation on testnet. That comparison is required before claiming 4.1/4.2.
@@ -68,5 +91,6 @@ npm run typecheck
 npm test
 ```
 
-On 21 October 2026: `tsc --noEmit` passed and 20 Vitest tests passed, including
-6 quote/wiring tests.
+On 22 October 2026: SDK `tsc --noEmit` passed and 20 Vitest tests passed,
+including 6 quote/wiring tests. Controller `tsc` build passed and 49 Jest tests
+passed on Node 22 Docker, including 3 HTTP quote-formula tests.

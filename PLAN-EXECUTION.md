@@ -14,9 +14,9 @@ The plan is a good **strategy document**. The implementation is a real but narro
 
 In plain terms:
 
-- **What is real:** RPC, Horizon/API, escrow, the core contract set, the SDK, the four-source price aggregator, the event indexer, persistent price history, TWAP/volatility, a deterministic risk calculator, raw financial event projections, and the Docker deployment.
+- **What is real:** RPC, Horizon/API, escrow, the core contract set, the SDK, the four-source price aggregator, the event indexer, persistent price history, TWAP/volatility, a deterministic risk calculator, enriched pool/lending event projections, and the Docker deployment.
 - **What is early:** indexing, historical backfill, contract discovery, controller security, observability, financial consumer integration.
-- **What is paper:** execution/quote service, capital vaults, liquidation network, settlement; liquidity-aware pricing and on-chain lending-position risk are not implemented.
+- **What is paper:** execution and capital, vaults, liquidation network, settlement; liquidity-aware pricing is not implemented. A deterministic CPMM quote preview now exists in the SDK and over HTTP, but it has not been matched against on-chain simulation.
 - **What is broken or overstated:** on-chain oracle publication, bridge mint authorization, secret hygiene, CI coverage of owner-managed deployment.
 - **What is accurate:** Section 3 ("Current State") is a fair description of the repos. The plan's own note at line 258 about missing USDC/USD/oUSD/USDT pricing is correct.
 
@@ -24,7 +24,7 @@ In plain terms:
 
 **Recommendation:** do **not** start Q2–Q4 2027 execution/capital work yet. Run a 90-day "Consolidate" phase first: correctness, security, data persistence, observability, CI, and documentation. The platform's credibility depends on the controller and data layer being trustworthy, not on shipping more contracts.
 
-**Update (21 October 2026):** Phase 0–2 are complete. Phase 3 is **partial**: TWAP/volatility and the risk calculator are implemented and tested, and `/financial/*` exposes raw pool/trade/liquidity projections. An internal **test-user consumer** now exercises price provenance, TWAP, risk and financial coverage end-to-end, so the consumer mechanics are demonstrated; production adoption and measured external usage are still absent. USD volume and LP positions are unavailable, and lending-pool events do not exist. Phase 4 has started only as a **quote preview** under an explicit owner-requested gate override; no execution or capital work is claimed.
+**Update (22 October 2026):** Phase 0-2 are complete. Phase 3 remains **partial**, but the documented data gaps are now addressed in code: CPMM/stableswap events carry token addresses, post-event reserves and share totals; lending-pool emits deposit/withdraw/borrow/repay/collateral/liquidation/accrual events with position snapshots; the indexer derives LP positions and lending positions; and an opt-in valuation route refuses stale or degraded prices. An internal **test-user consumer** exercises price provenance, TWAP, risk and financial coverage end-to-end, so the consumer mechanics are demonstrated; production adoption, deployment of the enriched contracts and measured external usage are still absent. Phase 4 has started as a **CPMM quote preview** under an explicit owner-requested gate override; no execution or capital work is claimed.
 
 ---
 
@@ -75,10 +75,10 @@ In plain terms:
 ### Section 8 — Financial infrastructure
 | Module | Status | Verdict |
 |---|---|---|
-| 8.1 Financial data | 🟡 | Pools, trades, liquidity events and activity projections exist; USD volume and LP positions are unavailable; an internal test-user consumer exists but production usage is absent. |
+| 8.1 Financial data | 🟡 | Pools, trades, liquidity events, LP positions and lending positions are projected from enriched events; USD valuation is opt-in and refuses stale/degraded prices. An internal test-user consumer exists but production usage is absent. |
 | 8.2 Oracle extension | 🟡 | TWAP/volatility, persistent series, provenance and freshness exist; liquidity-aware pricing is not implemented and is marked false. |
-| 8.3 Risk engine | 🟡 | Shared deterministic risk module and `/risk/*` API exist; no on-chain lending-position ingestion. |
-| 8.4 Execution | ❌ | RPC simulation and SDK swap methods exist; a deterministic CPMM quote preview exists in the SDK; no HTTP quote/route service or simulation parity yet. |
+| 8.3 Risk engine | 🟡 | Shared deterministic risk module and `/risk/*` API exist. An opt-in indexed route reads lending position snapshots from the data platform and labels its source and ledger. |
+| 8.4 Execution | ❌ | RPC simulation and SDK swap methods exist; deterministic CPMM previews exist in the SDK and over HTTP (`POST /quote/cpmm`, indexed-state `GET /quote/cpmm/:id`). Route discovery and on-chain simulation parity are not implemented. |
 | 8.5 Controller-to-financial integration | 🟡 | Versioned price/statistics/risk contracts and financial event projections exist; an internal test-user consumer exercises them and records coverage/freshness; production usage measurement is still absent. |
 | 8.6 Data quality model | 🟡 | Responses carry price/confidence/sources/freshness/trust and versioned methods; not the full plan metadata model. |
 | 8.7 Oracle trust model | ✅ | Explicit HEALTHY/DEGRADED/BREAKER/RECOVERY state machine with transition history. |
@@ -190,29 +190,21 @@ Missing per Section 22: `ARCHITECTURE.md`, `ROADMAP.md`, `PRODUCTS.md`, `SECURIT
 
 ## 4. What is partial or missing (the honest gap list)
 
-### L1 — Data
-- Indexer only handles contract events. No accounts, transactions, operations, assets, pools, positions.
-- No webhook subscription/delivery system.
-- No idempotency contract beyond ledger checkpoints.
-- No indexer lag, completeness, or reorg/replay metrics.
-- No normalized schemas or schema versioning.
-- No API keys, quotas, or usage metering.
+### L1 - Data
+- Normalized ledgers/transactions/operations/accounts/events, checkpoints, API keys/quotas, webhooks and historical queries exist.
+- Remaining: public deployment, production backfill/capacity proof, and a bounded scan for account activity because account addresses are encoded in topic XDR.
+- Remaining: contract metadata is registry-based; there is no automatic discovery of every deployed contract.
 
-### L2 — Financial
-- Price coverage is Pi/USD only. The plan explicitly requires USDC/USD, USDT/USD, oUSD coverage.
-- No persistent price observations, no historical query API, no TWAP.
-- No liquidity, volume, volatility, concentration metrics.
-- No shared risk engine.
-- No explicit oracle state machine.
-- Confidence and sources are returned, but not a full provenance/quality object.
-- Price history is lost on every restart.
+### L2 - Financial
+- PI/USDC/USDT are priced; oUSD has no default feed and returns `503` rather than a synthetic peg.
+- Persistent observations, `/history`, TWAP/volatility, a shared risk engine and an oracle trust state machine exist.
+- Pool events now carry token direction, post-event reserves and share totals; LP positions and lending positions are derived from indexed events.
+- Remaining: liquidity-aware pricing, a production consumer, configured token/price mappings for USD valuation, and deployment/indexing of the enriched contracts.
+- Remaining: concentration metrics and a full provenance/quality object beyond the current fields.
 
-### L3 — Execution
-- No quote service.
-- No route discovery.
-- No price-impact calculator.
-- No execution simulation API beyond raw RPC simulate.
-- No transaction construction service.
+### L3 - Execution
+- A deterministic CPMM quote preview exists in the SDK and over HTTP.
+- Remaining: quote/route discovery, on-chain `get_quote` simulation parity, execution simulation API beyond raw RPC simulate, and a transaction construction service.
 
 ### L4 — Capital
 - No strategy vault framework.
@@ -481,46 +473,63 @@ Status: done ● / partial ◐ / not started ○
 
 **Goal:** make L2 real, but derived from the now-reliable data layer.
 
-Status as of 21 October 2026: **partial**. The calculation/projection layer is
-implemented and tested, and an internal test-user consumer now exercises the
-public routes. The production consumer/exit criterion is not met.
+Status as of 22 October 2026: **partial**. The calculation/projection layer is
+implemented and tested, and the documented event-data gaps are addressed in the
+contracts and indexer. An internal test-user consumer exercises the public
+routes. The production consumer/exit criterion is not met, and the enriched
+contracts still need deployment and live indexing.
 
 | # | Task | Status | Evidence / gap |
 |---|---|---|---|
-| 3.1 | Financial data API | Partial | `/financial/*` pools, trades, liquidity, activity and summary derived from indexed events. Raw amounts only; USD volume and LP positions explicitly unavailable. Lending events absent. |
+| 3.1 | Financial data API | Partial (code-complete) | `/financial/*` pools, trades, liquidity, account activity, summary, `/pools/:id/lp-positions`, `/lending/events`, `/lending/accounts/:id` and `/lending/summary` project enriched events. Pool events carry token direction, post-event reserves and total shares; lending events carry position snapshots and pool totals. USD valuation is opt-in via `/pools/:id/valuation` and returns `503` without fresh, healthy, configured prices. Legacy events remain explicitly unenriched. |
 | 3.2 | Historical price series | Done | SQLite persistence and `/history`; reopen test proves 30-day-capable storage survives restart. |
 | 3.3 | TWAP and volatility | Done | `twap_volatility_v1`; deterministic pure-function tests; `/statistics`, `/twap`, `/volatility`. |
 | 3.4 | Oracle extension | Partial | Provenance/freshness/confidence/trust and `/methodology` are versioned. Liquidity-aware pricing is not implemented and is marked `false`. |
-| 3.5 | Risk engine v0 | Done | `lending_risk_v1`; deterministic vectors for health factor, collateral value, max borrow and liquidation price. |
-| 3.6 | Risk API | Done | `/risk/methods` and `POST /risk/lending`; unknown/unconfigured/missing/stale prices return `404`/`503` without partial fabricated results; fresh non-HEALTHY prices are labelled degraded. |
-| 3.7 | Consumer integration | Partial | `tools/test-consumer/consumer.mjs` is a deterministic internal test user. It exercises `/price`, `/statistics`, `/risk/lending`, `/financial/summary` and `/financial/pools`, requires freshness/confidence/coverage fields, records a JSON usage report and runs in CI. A live run against the rebuilt controller and indexer passed 5/5 checks. Production/external adoption and real usage measurement are still absent. |
+| 3.5 | Risk engine v0 | Done | `lending_risk_v1`; deterministic vectors for health factor, collateral value, max borrow and liquidation price. The on-chain lending health-factor formula now returns basis points consistently with its `10_000` threshold. |
+| 3.6 | Risk API | Done (deployment-dependent reader) | `/risk/methods`, `POST /risk/lending`, and opt-in `GET /risk/lending/indexed/:account`. Unknown/unconfigured/missing/stale prices return `404`/`503` without partial fabricated results; fresh non-HEALTHY prices are labelled degraded. The indexed route labels `indexed_contract_events`, exposes the source ledger and can lag the chain. |
+| 3.7 | Consumer integration | Partial | `tools/test-consumer/consumer.mjs` is a deterministic internal test user. It exercises `/price`, `/statistics`, `/risk/lending`, `/financial/summary` and `/financial/pools`, requires freshness/confidence/coverage fields, records a JSON usage report and runs in CI. A live run against the previous indexer passed 5/5 checks; it has not yet been rerun against a deployment of the enriched contracts. Production/external adoption and real usage measurement are still absent. |
 
 **Exit criterion:** at least one financial application consumes Suban financial data/oracle services, and freshness/confidence is visible to it. **Partially met by the internal test user; production/external usage is not claimed.** The test user is sufficient to exercise the consumer mechanics for plan execution, but not to claim Phase 3 complete.
 
 **Accepted gaps**
 
-- Pool events lack pool address, reserves, token direction/decimals and reliable
-  initial LP state.
-- `lending-pool` emits no events, so positions and liquidations cannot be
-  derived from the indexer.
-- The risk API is a calculator over caller-supplied positions and live prices;
-  it does not read on-chain lending state.
+- The enriched event payloads are not deployed to the existing testnet contracts
+  yet, so a live indexer only sees enriched data after redeployment/reindexing.
+- The risk reader depends on the data platform being configured with
+  `DATA_PLATFORM_URL`; without it the indexed route returns `503`. It reads
+  indexed snapshots, not live contract storage.
+- USD valuation stays opt-in. It needs `INDEXER_PRICE_API_URL`,
+  `INDEXER_TOKEN_ASSETS` and `INDEXER_TOKEN_DECIMALS`, and refuses stale or
+  non-HEALTHY prices. It is a live valuation, not a historical USD-volume series.
+- LP balances are derived by netting internal add/remove-share events. The pool
+  contracts do not support LP-token transfers, so this is exact for current
+  contracts but is not a generic LP-token indexer.
+- Account activity and lending-account lookup use bounded recent-event scans
+  because account addresses are encoded in topic XDR.
 - The internal test user records consumer-side usage, but there is no
   production/external consumer or adoption measurement.
 - Phase 4 is allowed only as a preview under an explicit gate override; no
   execution or capital work is claimed.
 
-**Verification (21 October 2026):**
+**Verification (22 October 2026):**
 
-- `suban-controller`: `tsc` build passes; 43 Jest tests pass on Node 22 Docker.
-- `event-indexer`: `tsc --noEmit` passes; 15 Vitest tests pass on Node 22 Docker.
-- Test-user consumer: 3 Node contract tests pass; a live run against the rebuilt controller and indexer returned `status: ok` with 5/5 checks (price provenance, TWAP, risk, financial summary, financial pools). The report records `coverage.lp_positions=false` and `coverage.usd_volume=false` rather than inventing them.
-- SDK quote preview: `tsc --noEmit` passes; 20 Vitest tests pass, including 6 deterministic CPMM quote/wiring tests.
-- Live controller smoke test: `/api/v1/methodology` and `/api/v1/risk/methods` return `200`; `/api/v1/statistics` returns `503` with an empty history database; a future `as_of` returns `400`; unknown assets return `404` and malformed risk bodies return `400`.
-- CI: `suban-controller` run `39615138136` succeeded; `Suban` run `39621991705` succeeded, including the new `Test consumer` job and SDK quote tests.
+- Rust workspace: `cargo test --workspace` passes; the targeted CPMM,
+  stableswap and lending-pool run contributes 31 passing tests, including new
+  event-payload and health-factor tests.
+- `suban-controller`: `tsc` build passes; 49 Jest tests pass on Node 22 Docker,
+  including the data-platform client and CPMM quote tests.
+- `event-indexer`: `tsc` build passes; 17 Vitest tests pass on Node 22 Docker,
+  including enriched pool, LP-position, lending-position, fresh-price valuation
+  and stale/degraded `503` checks.
+- Test-user consumer: 3 Node contract tests pass; the coverage check now accepts
+  supported LP positions and an explicit boolean USD-valuation flag.
+- SDK quote preview: `tsc --noEmit` passes; 20 Vitest tests pass, including 6
+  deterministic CPMM quote/wiring tests.
+- CI: the previous green runs were `suban-controller` `39615138136` and `Suban`
+  `39621991705`; the new commits must be verified by the next CI run.
 
-No USD volume, LP position, on-chain lending position or production consumer
-usage is claimed.
+No production consumer, live enriched-contract deployment, historical USD-volume
+series or capital/execution usage is claimed.
 
 ---
 
@@ -530,7 +539,7 @@ usage is claimed.
 
 **Gate before starting:** data platform stable, oracle reliable, at least one consumer, no P0/P1 defects open.
 
-**Status (21 October 2026): preview started under an explicit owner-requested gate override.** The owner directed execution to continue without waiting for owner-only actions and to use an internal test user instead of a real consumer. This does **not** satisfy the Phase 4 gate and does **not** authorize capital. Only the deterministic quote preview is implemented; no execution, vault, liquidation or capital work is claimed.
+**Status (22 October 2026): preview started under an explicit owner-requested gate override.** The owner directed execution to continue without waiting for owner-only actions and to use an internal test user instead of a real consumer. This does **not** satisfy the Phase 4 gate and does **not** authorize capital. The SDK and HTTP CPMM quote preview are implemented; no execution, route discovery, vault, liquidation or capital work is claimed.
 
 | Gate item | State |
 |---|---|
@@ -539,14 +548,15 @@ usage is claimed.
 | At least one consumer | Internal test user exists and passes live checks; production/external consumer is still absent. |
 | No open P0/P1 defects | Not met: secret rotation and git-history purge are owner-blocked; bridge mint authorization remains gated. |
 
-The Phase 4 table below remains the plan. The SDK quote preview is a partial
-implementation of 4.1/4.2 only; it is not a deployed `/quote` service and has not
-been matched against on-chain simulation.
+The Phase 4 table below remains the plan. The SDK and HTTP quote previews are a
+partial implementation of 4.1/4.2 only. The HTTP service is deterministic over
+caller-supplied reserves or indexed pool state; it has not been matched against
+on-chain `get_quote` simulation.
 
 | # | Task | Deliverable | Acceptance criteria |
 |---|---|---|---|
-| 4.1 | Quote service | `/quote` using existing swap contracts (preview: SDK `quoteCpmm` + `CpmmPoolClient.getQuote`) | Matches on-chain simulation within tolerance; not yet verified |
-| 4.2 | Simulation API | Preflight + price impact (preview: deterministic CPMM impact) | Reproducible results; HTTP API not yet built |
+| 4.1 | Quote service | Preview in SDK `quoteCpmm`, `CpmmPoolClient.getQuote`, `POST /api/v1/quote/cpmm`, and indexed-state `GET /api/v1/quote/cpmm/:contractId` | Deterministic integer formula tested; on-chain simulation parity and route discovery still missing |
+| 4.2 | Simulation API | Preview: deterministic CPMM price impact in SDK and HTTP responses | Reproducible results; RPC preflight simulation not yet built |
 | 4.3 | Route discovery | Only across real liquidity | No synthetic venues |
 | 4.4 | Vault framework (testnet) | Caps, pause, strategy isolation | Deposit/withdraw/pause tests pass |
 | 4.5 | Lending hardening | Oracle integration, liquidation tests | Liquidation path tested end-to-end |

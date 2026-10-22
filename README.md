@@ -23,7 +23,7 @@ integrate.
 |---|---|---|
 | Controller | `3000` | Market data/oracle; control routes authenticated |
 | Data API | `4000` | Horizon-compatible reads |
-| Event indexer / data platform | `3002` | Indexed ledgers, transactions, operations, accounts and contract events; public keys/quotas and webhooks. Financial projections are partial (raw amounts; no USD volume or LP positions) |
+| Event indexer / data platform | `3002` | Indexed ledgers, transactions, operations, accounts and contract events; public keys/quotas and webhooks. Financial projections include pool reserves, token direction, derived LP positions and lending position snapshots; USD valuation is opt-in and refuses stale prices |
 | Bridge relayer | `9464` | Metrics/health only; no public API |
 | RPC | `8000` / `8001` | Public JSON-RPC / private admin |
 | Horizon | `31401` / `41401` | Testnet / mainnet local Horizon |

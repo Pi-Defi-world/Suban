@@ -193,7 +193,16 @@ impl CpmmPool {
 
         env.events().publish(
             (symbol_short!("add_liq"), &provider),
-            (amount_a, amount_b, shares),
+            (
+                amount_a,
+                amount_b,
+                shares,
+                token_a_addr,
+                token_b_addr,
+                reserve_a + amount_a,
+                reserve_b + amount_b,
+                total_shares + shares,
+            ),
         );
 
         Ok(shares)
@@ -248,7 +257,16 @@ impl CpmmPool {
 
         env.events().publish(
             (symbol_short!("rm_liq"), &provider),
-            (amount_a, amount_b, shares_in),
+            (
+                amount_a,
+                amount_b,
+                shares_in,
+                token_a_addr,
+                token_b_addr,
+                reserve_a - amount_a,
+                reserve_b - amount_b,
+                total_shares - shares_in,
+            ),
         );
 
         Ok((amount_a, amount_b))
@@ -305,9 +323,28 @@ impl CpmmPool {
         // CEI: update reserves before sending the outbound tokens.
         token::Client::new(&env, &token_out_addr).transfer(&vault, &trader, &amount_out);
 
+        let (reserve_a_after, reserve_b_after) = if swap_to_a {
+            (reserve_out - amount_out, reserve_in + amount_in)
+        } else {
+            (reserve_in + amount_in, reserve_out - amount_out)
+        };
+        let token_a_addr: Address = env.storage().instance().get(&DataKey::TokenA).unwrap();
+        let token_b_addr: Address = env.storage().instance().get(&DataKey::TokenB).unwrap();
+
         env.events().publish(
             (symbol_short!("swap"), &trader),
-            (amount_in, amount_out),
+            (
+                amount_in,
+                amount_out,
+                token_in,
+                token_out_addr,
+                reserve_a_after,
+                reserve_b_after,
+                fee_bps,
+                read_total_shares(&env),
+                token_a_addr,
+                token_b_addr,
+            ),
         );
 
         Ok(amount_out)
@@ -373,7 +410,8 @@ mod test {
     extern crate std;
     use super::{CpmmPool, CpmmPoolClient, PoolError};
     use soroban_sdk::{
-        contract, contractimpl, testutils::Address as _, Address, Env,
+        contract, contractimpl, symbol_short, testutils::Address as _,
+        testutils::Events as _, Address, Env, Symbol, TryFromVal,
     };
 
     #[contract]
@@ -403,6 +441,20 @@ mod test {
     }
 
     use super::token::Client as TokenClient;
+
+    fn last_event(env: &Env) -> (soroban_sdk::Vec<soroban_sdk::Val>, soroban_sdk::Val) {
+        let events = env.events().all();
+        let event = events.events().last().unwrap();
+        let body = match &event.body {
+            soroban_sdk::xdr::ContractEventBody::V0(v0) => v0,
+        };
+        let mut topics = soroban_sdk::Vec::new(env);
+        for value in body.topics.iter() {
+            topics.push_back(soroban_sdk::Val::try_from_val(env, value).unwrap());
+        }
+        let data = soroban_sdk::Val::try_from_val(env, &body.data).unwrap();
+        (topics, data)
+    }
 
     fn setup() -> (Env, CpmmPoolClient<'static>, Address, Address, Address) {
         let env = Env::default();
@@ -465,6 +517,58 @@ mod test {
         let (ra, rb) = pool.get_reserves();
         assert_eq!(ra, 11_000);
         assert_eq!(rb, 10_000 - amount_out);
+    }
+
+    #[test]
+    fn test_liquidity_event_carries_lp_state() {
+        let (env, pool, token_a, token_b, _) = setup();
+        let provider = Address::generate(&env);
+        MockTokenClient::new(&env, &token_a).mint(&provider, &100_000);
+        MockTokenClient::new(&env, &token_b).mint(&provider, &100_000);
+
+        pool.add_liquidity(&provider, &10_000, &10_000, &0);
+
+        let (topics, data) = last_event(&env);
+        let name = Symbol::try_from_val(&env, &topics.get(0).unwrap()).unwrap();
+        assert_eq!(name, symbol_short!("add_liq"));
+        let payload = <(i128, i128, i128, Address, Address, i128, i128, i128)>::try_from_val(
+            &env, &data,
+        )
+        .unwrap();
+        assert_eq!(payload.3, token_a);
+        assert_eq!(payload.4, token_b);
+        assert_eq!(payload.5, 10_000);
+        assert_eq!(payload.6, 10_000);
+        assert_eq!(payload.7, payload.2);
+    }
+
+    #[test]
+    fn test_swap_event_carries_direction_and_reserves() {
+        let (env, pool, token_a, token_b, _) = setup();
+        let provider = Address::generate(&env);
+        let trader = Address::generate(&env);
+        MockTokenClient::new(&env, &token_a).mint(&provider, &100_000);
+        MockTokenClient::new(&env, &token_b).mint(&provider, &100_000);
+        pool.add_liquidity(&provider, &10_000, &10_000, &0);
+        MockTokenClient::new(&env, &token_a).mint(&trader, &10_000);
+
+        let amount_out = pool.swap(&trader, &token_a, &1000, &0);
+
+        let (topics, data) = last_event(&env);
+        let name = Symbol::try_from_val(&env, &topics.get(0).unwrap()).unwrap();
+        assert_eq!(name, symbol_short!("swap"));
+        let payload =
+            <(i128, i128, Address, Address, i128, i128, u32, i128, Address, Address)>::try_from_val(
+                &env, &data,
+            )
+            .unwrap();
+        assert_eq!(payload.2, token_a);
+        assert_eq!(payload.3, token_b);
+        assert_eq!(payload.4, 11_000);
+        assert_eq!(payload.5, 10_000 - amount_out);
+        assert_eq!(payload.6, 30);
+        assert_eq!(payload.8, token_a);
+        assert_eq!(payload.9, token_b);
     }
 
     #[test]

@@ -142,31 +142,38 @@ backfill and capacity testing are deployment decisions.
 **Current state:** local and Docker smoke tests pass; public deployment is not
 claimed.
 
-## 9. Phase 3 event coverage and consumer
+## 9. Deploy enriched financial events and find a production consumer
 
-**Owner:** contract maintainers plus product/consumer owner.
+**Owner:** contract deployer/operator plus product/consumer owner.
 
-**Why deferred:** the Phase 3 projection and risk layers are implemented, but
-the contracts do not emit enough state for a real financial data product. An
-internal test user now exercises the APIs, but no production application
-consumes them with measured usage.
+**Why deferred:** the Phase 3 projection and risk layers are implemented in
+code, but the existing testnet contracts must be redeployed and reindexed before
+the enriched payloads are visible. An internal test user exercises the APIs, but
+no production application consumes them with measured usage.
 
 **Do later:**
 
-1. Add pool identity, reserves, token direction/decimals and initial LP state to
-   CPMM/stableswap events, or index the corresponding contract state directly.
-2. Add lending-pool events for deposits, borrows, repayments, collateral changes
-   and liquidations.
-3. Replace the internal test user with a production consumer that displays
+1. Deploy the updated CPMM, stableswap and lending-pool contracts with the
+   enriched event payloads.
+2. Reindex the deployment window and verify `/financial/pools/:id` returns
+   token/reserve/share state, `/financial/pools/:id/lp-positions` derives LP
+   shares, and `/financial/lending/accounts/:id` returns position snapshots.
+3. If USD valuation is required, configure `INDEXER_PRICE_API_URL`,
+   `INDEXER_TOKEN_ASSETS` and `INDEXER_TOKEN_DECIMALS`; verify stale or
+   non-HEALTHY prices return `503` instead of a USD value.
+4. Configure `DATA_PLATFORM_URL` on the controller and verify
+   `/risk/lending/indexed/:account` labels its ledger and source.
+5. Replace the internal test user with a production consumer that displays
    freshness/confidence and records real usage.
-4. Only then evaluate the Phase 3 exit criterion and the Phase 4 gate.
+6. Only then evaluate the Phase 3 exit criterion and the Phase 4 gate.
 
 **Current state:** `tools/test-consumer/consumer.mjs` exercises the APIs and
-records freshness/confidence/coverage; it is not production adoption.
-`/financial/*` exposes raw event projections with `usd_volume=false` and
-`lp_positions=false`; the risk API is a deterministic calculator and does not
-read on-chain positions. Phase 3 is **not complete**. Phase 4 is limited to an
-SDK quote preview under an explicit gate override.
+records freshness/confidence/coverage; it is not production adoption. The
+contract and indexer code now supports enriched pool/lending events, derived LP
+positions, opt-in USD valuation and indexed risk reads, but live deployment and
+production adoption are not claimed. Phase 3 is **not complete**. Phase 4 is
+limited to SDK/HTTP CPMM quote previews under an explicit gate override; there
+is no on-chain simulation parity or route discovery.
 
 ---
 

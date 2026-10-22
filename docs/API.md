@@ -180,7 +180,40 @@ partial results. A fresh price whose trust state is not `HEALTHY` is returned
 with `data_quality.status: "degraded"`.
 The response contains `health_factor`, `collateral_value_usd`, `debt_value_usd`,
 `max_borrow_usd` and `liquidation_price_usd_per_collateral_unit` (single
-collateral only). The calculator does not read on-chain lending positions.
+collateral only).
+
+`GET /api/v1/risk/lending/indexed/:account` is an opt-in alternative that reads
+the latest indexed lending-pool snapshot from the data platform. Configure
+`DATA_PLATFORM_URL` (and optionally `DATA_PLATFORM_API_KEY`). Required query
+parameters are `collateral_decimals` and `debt_decimals`; optional parameters
+are `collateral_asset` (default `PI`), `debt_asset` (default `USDC`) and the
+same threshold/target fields. The response labels the source as
+`indexed_contract_events`, includes the source ledger/timestamp, and returns
+`503` when the data platform is not configured or a price is stale/missing.
+Indexed positions can lag the chain; they are not live contract storage.
+
+### 4.3.4 CPMM quote preview
+
+`POST /api/v1/quote/cpmm` accepts raw integer token units:
+
+```json
+{
+  "reserve_in": "1000000",
+  "reserve_out": "1000000",
+  "amount_in": "1000",
+  "fee_bps": 30
+}
+```
+
+The response is versioned as `quote_v1` with `data_quality.status: "preview"`
+and includes `amount_out_raw`, `fee_amount_raw`, spot/execution price and
+`price_impact_bps`. Reserves are caller-supplied; this is not an execution-time
+quote.
+
+`GET /api/v1/quote/cpmm/:contractId?token_in=...&amount_in=...` uses the latest
+enriched pool state from the data platform. It returns the source ledger in
+`data_quality.as_of` and refuses pools without token/reserve/fee metadata. It is
+still a preview over indexed state, not a live `get_quote` simulation.
 
 ### 4.4 `GET /api/v1/trust?asset=PI`
 
@@ -280,20 +313,29 @@ from SQLite and never calls Horizon or Soroban RPC in a query handler.
 | `GET /accounts/:accountId` | Indexed account or activity stub |
 | `GET /accounts/:id/transactions` | Transactions involving the account |
 | `GET /accounts/:id/operations` | Operations involving the account |
-| `GET /financial/pools` | Pool activity derived from swap/liquidity events |
-| `GET /financial/pools/:contractId` | Raw volume, recent events and explicit gap flags |
-| `GET /financial/pools/:contractId/trades` | Swap events with raw amounts |
-| `GET /financial/pools/:contractId/liquidity` | Add/remove-liquidity events |
+| `GET /financial/pools` | Pool activity, latest reserves and derived LP positions |
+| `GET /financial/pools/:contractId` | Pool state, volume, LP positions and recent events |
+| `GET /financial/pools/:contractId/trades` | Swap events with token direction and post-trade reserves |
+| `GET /financial/pools/:contractId/liquidity` | Add/remove-liquidity events with share totals |
+| `GET /financial/pools/:contractId/lp-positions` | Net LP shares derived from add/remove events |
+| `GET /financial/pools/:contractId/valuation` | Opt-in USD reserves/volume; refuses stale or degraded prices |
+| `GET /financial/lending/events` | Deposit/withdraw/borrow/repay/collateral/liquidation/accrual events |
+| `GET /financial/lending/accounts/:accountId` | Latest indexed lending position snapshot |
+| `GET /financial/lending/summary` | Lending event counts and latest event |
 | `GET /financial/accounts/:accountId/activity` | Bounded recent account activity |
-| `GET /financial/summary` | Financial event counts and latest event |
+| `GET /financial/summary` | Pool/lending counts, latest event and coverage flags |
 | `GET /ledgers` | Recent indexed ledgers |
 | `GET /ledgers/:sequence` | One indexed ledger |
 | `GET /health` | `200` healthy, `503` degraded/stale |
 | `GET /metrics` | Prometheus metrics (`suban_indexer_*`) |
 
-Financial routes expose raw event amounts only. `coverage.usd_volume` and
-`coverage.lp_positions` are `false`: current events do not carry token
-direction, decimals or LP balances. No USD value is inferred.
+Financial routes use enriched pool/lending events. `coverage.lp_positions` is
+`true` and reflects netted internal add/remove-share events; it is not a
+transferable LP-token balance. `coverage.usd_volume` is `true` only when
+`INDEXER_PRICE_API_URL`, `INDEXER_TOKEN_ASSETS` and `INDEXER_TOKEN_DECIMALS` are
+all configured. The valuation route returns `503` for stale, non-HEALTHY or
+unmapped prices and never infers a USD value from raw amounts alone. Legacy
+events remain readable but report missing direction/reserves/LP state.
 
 All data responses include `schema_version: "2.0"` and `freshness`:
 

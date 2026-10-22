@@ -88,21 +88,32 @@ yet offered. Status values are:
 |---|---|
 | What | Versioned lending-risk formulas: collateral value, debt value, health factor, max borrow and single-collateral liquidation price |
 | For | Integrators that want consistent risk math before on-chain lending-state indexing exists |
-| Interface | `GET /api/v1/risk/methods`, `POST /api/v1/risk/lending` |
+| Interface | `GET /api/v1/risk/methods`, `POST /api/v1/risk/lending`, opt-in `GET /api/v1/risk/lending/indexed/:account` |
 | Repository | `suban-controller` |
-| Status | Implemented as a calculator |
-| Limits | Does not read on-chain lending positions. Prices come from live aggregators; missing or stale prices return `503`, fresh non-HEALTHY prices are marked degraded. Liquidation price is `null` for multi-collateral baskets. |
+| Status | Implemented as a calculator plus an indexed-snapshot reader |
+| Limits | The POST route uses caller-supplied positions. The indexed route reads data-platform snapshots (`DATA_PLATFORM_URL`), can lag the chain and is not live contract storage. Prices come from live aggregators; missing or stale prices return `503`, fresh non-HEALTHY prices are marked degraded. Liquidation price is `null` for multi-collateral baskets. |
 
 ### 2.5 Financial event projections
 
 | | |
 |---|---|
-| What | Pool, trade, liquidity and bounded account-activity views derived from indexed contract events |
-| For | Explorers and analytics that need to inspect real swap/liquidity activity |
-| Interface | `/financial/pools`, `/financial/pools/:id`, `/trades`, `/liquidity`, `/financial/accounts/:id/activity`, `/financial/summary` on the data platform (`:3002`) |
+| What | Pool, trade, liquidity, LP-position, lending-position and bounded account-activity views derived from indexed contract events |
+| For | Explorers and analytics that need to inspect real swap/liquidity/lending activity |
+| Interface | `/financial/pools`, `/financial/pools/:id`, `/trades`, `/liquidity`, `/pools/:id/lp-positions`, `/pools/:id/valuation`, `/financial/lending/events`, `/financial/lending/accounts/:id`, `/financial/lending/summary`, `/financial/accounts/:id/activity`, `/financial/summary` on the data platform (`:3002`) |
 | Repository | `Suban/services/event-indexer` |
-| Status | Partial |
-| Limits | Raw amounts only; USD volume and LP positions are explicitly unavailable. Current events lack token direction/decimals and LP balances. Lending events do not exist. No consumer integration yet. |
+| Status | Code-complete, deployment-dependent |
+| Limits | Enriched events must be deployed and reindexed. USD valuation is opt-in, live-only and returns `503` for stale/degraded/unmapped prices. LP positions are netted internal share events, not transferable LP tokens. Lending positions are bounded indexed snapshots. No production consumer yet. |
+
+### 2.6 CPMM quote preview
+
+| | |
+|---|---|
+| What | Deterministic constant-product quote and price-impact preview in the SDK and over HTTP |
+| For | Integrators prototyping swap UX without building a router |
+| Interface | SDK `quoteCpmm` / `CpmmPoolClient.getQuote`; `POST /api/v1/quote/cpmm`; `GET /api/v1/quote/cpmm/:contractId` |
+| Repository | `Suban/sdk`, `suban-controller` |
+| Status | Preview only; Phase 4 gate not met |
+| Limits | Caller-supplied reserves or indexed pool state; no route discovery, no on-chain `get_quote` parity test, no stableswap quote, and no execution or transaction construction. Indexed state can lag the chain. |
 
 ## 3. Value-movement products
 

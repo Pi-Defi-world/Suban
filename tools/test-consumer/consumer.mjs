@@ -240,8 +240,8 @@ export async function runConsumer({
       finiteNumber(body.counts.swap) &&
       finiteNumber(body.counts.add_liquidity) &&
       finiteNumber(body.counts.remove_liquidity) &&
-      body.coverage?.lp_positions === false &&
-      body.coverage?.usd_volume === false;
+      body.coverage?.lp_positions === true &&
+      typeof body.coverage?.usd_volume === 'boolean';
     checks.push(
       check(
         'financial.summary',
@@ -274,14 +274,14 @@ export async function runConsumer({
     const valid =
       pools.status === 200 &&
       Array.isArray(body.data) &&
-      body.coverage?.usd_volume === false &&
-      body.coverage?.lp_positions === false;
+      typeof body.coverage?.usd_volume === 'boolean' &&
+      body.coverage?.lp_positions === true;
     checks.push(
       check(
         'financial.pools',
         valid,
         valid
-          ? 'pool list and raw-only coverage are visible'
+          ? 'pool list and explicit coverage flags are visible'
           : 'pool list is unavailable or missing coverage flags',
         pools.status
       )

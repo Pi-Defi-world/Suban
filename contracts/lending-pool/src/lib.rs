@@ -136,6 +136,24 @@ impl LendingPool {
         let vault = env.current_contract_address();
         asset.transfer(&from, &vault, &amount);
 
+        let (deposit_after, borrow_after, collateral_after) =
+            Self::read_user_position(&env, &from);
+        let (total_supply_after, total_borrows_after, total_reserves_after) =
+            Self::read_pool_totals(&env);
+        env.events().publish(
+            (symbol_short!("deposit"), &from),
+            (
+                amount,
+                b_tokens,
+                deposit_after,
+                borrow_after,
+                collateral_after,
+                total_supply_after,
+                total_borrows_after,
+                total_reserves_after,
+            ),
+        );
+
         Ok(b_tokens)
     }
 
@@ -183,6 +201,24 @@ impl LendingPool {
         let vault = env.current_contract_address();
         asset.transfer(&vault, &from, &underlying);
 
+        let (deposit_after, borrow_after, collateral_after) =
+            Self::read_user_position(&env, &from);
+        let (total_supply_after, total_borrows_after, total_reserves_after) =
+            Self::read_pool_totals(&env);
+        env.events().publish(
+            (symbol_short!("withdraw"), &from),
+            (
+                b_token_amount,
+                underlying,
+                deposit_after,
+                borrow_after,
+                collateral_after,
+                total_supply_after,
+                total_borrows_after,
+                total_reserves_after,
+            ),
+        );
+
         Ok(underlying)
     }
 
@@ -225,6 +261,23 @@ impl LendingPool {
         let vault = env.current_contract_address();
         asset.transfer(&vault, &from, &amount);
 
+        let (deposit_after, borrow_after, collateral_after) =
+            Self::read_user_position(&env, &from);
+        let (total_supply_after, total_borrows_after, total_reserves_after) =
+            Self::read_pool_totals(&env);
+        env.events().publish(
+            (symbol_short!("borrow"), &from),
+            (
+                amount,
+                deposit_after,
+                borrow_after,
+                collateral_after,
+                total_supply_after,
+                total_borrows_after,
+                total_reserves_after,
+            ),
+        );
+
         Ok(())
     }
 
@@ -256,6 +309,23 @@ impl LendingPool {
         let vault = env.current_contract_address();
         asset.transfer(&from, &vault, &repay_amount);
 
+        let (deposit_after, borrow_after, collateral_after) =
+            Self::read_user_position(&env, &from);
+        let (total_supply_after, total_borrows_after, total_reserves_after) =
+            Self::read_pool_totals(&env);
+        env.events().publish(
+            (symbol_short!("repay"), &from),
+            (
+                repay_amount,
+                deposit_after,
+                borrow_after,
+                collateral_after,
+                total_supply_after,
+                total_borrows_after,
+                total_reserves_after,
+            ),
+        );
+
         Ok(repay_amount)
     }
 
@@ -286,6 +356,23 @@ impl LendingPool {
         if health < 10000 {
             return Err(PoolError::HealthFactorBelowOne);
         }
+
+        let (deposit_after, borrow_after, collateral_after) =
+            Self::read_user_position(&env, &user);
+        let (total_supply_after, total_borrows_after, total_reserves_after) =
+            Self::read_pool_totals(&env);
+        env.events().publish(
+            (symbol_short!("set_col"), &user),
+            (
+                amount,
+                deposit_after,
+                borrow_after,
+                collateral_after,
+                total_supply_after,
+                total_borrows_after,
+                total_reserves_after,
+            ),
+        );
 
         Ok(())
     }
@@ -352,6 +439,24 @@ impl LendingPool {
         asset.transfer(&liquidator, &vault, &actual_repay);
         asset.transfer(&vault, &liquidator, &collateral_seize);
 
+        let (borrower_deposit_after, borrower_borrow_after, borrower_collateral_after) =
+            Self::read_user_position(&env, &borrower);
+        let (total_supply_after, total_borrows_after, total_reserves_after) =
+            Self::read_pool_totals(&env);
+        env.events().publish(
+            (symbol_short!("liquidate"), &liquidator, &borrower),
+            (
+                actual_repay,
+                collateral_seize,
+                borrower_deposit_after,
+                borrower_borrow_after,
+                borrower_collateral_after,
+                total_supply_after,
+                total_borrows_after,
+                total_reserves_after,
+            ),
+        );
+
         Ok(())
     }
 
@@ -379,6 +484,17 @@ impl LendingPool {
         env.storage().instance().set(&TOTAL_BORROWS, &total_borrows_new);
         env.storage().instance().set(&TOTAL_RESERVES, &(total_reserves + reserve_share));
         env.storage().instance().set(&LAST_ACCRUAL, &current_ledger);
+
+        env.events().publish(
+            (symbol_short!("accrue"),),
+            (
+                interest,
+                reserve_share,
+                total_borrows_new,
+                total_reserves + reserve_share,
+                current_ledger,
+            ),
+        );
 
         Ok(())
     }
@@ -509,6 +625,38 @@ impl LendingPool {
             .unwrap_or_else(|| env.current_contract_address())
     }
 
+    fn read_user_position(env: &Env, user: &Address) -> (i128, i128, i128) {
+        let user_deposits: Map<Address, i128> = env
+            .storage()
+            .instance()
+            .get(&USER_DEPOSITS)
+            .unwrap_or(Map::new(env));
+        let user_borrows: Map<Address, i128> = env
+            .storage()
+            .instance()
+            .get(&USER_BORROWS)
+            .unwrap_or(Map::new(env));
+        let user_collateral: Map<Address, i128> = env
+            .storage()
+            .instance()
+            .get(&USER_COLLATERAL)
+            .unwrap_or(Map::new(env));
+
+        (
+            user_deposits.get(user.clone()).unwrap_or(0),
+            user_borrows.get(user.clone()).unwrap_or(0),
+            user_collateral.get(user.clone()).unwrap_or(0),
+        )
+    }
+
+    fn read_pool_totals(env: &Env) -> (i128, i128, i128) {
+        (
+            env.storage().instance().get(&TOTAL_SUPPLIES).unwrap_or(0),
+            env.storage().instance().get(&TOTAL_BORROWS).unwrap_or(0),
+            env.storage().instance().get(&TOTAL_RESERVES).unwrap_or(0),
+        )
+    }
+
     fn calculate_health_factor(env: &Env, user: &Address) -> Result<i128, PoolError> {
         let user_collateral: Map<Address, i128> = env
             .storage()
@@ -537,7 +685,9 @@ impl LendingPool {
         let collateral_value = collateral * liquidation_threshold;
         let borrow_value = borrow * 10000;
 
-        Ok(collateral_value / borrow_value)
+        // Return the health factor in basis points (10_000 = 1.0), matching
+        // the callers that compare against 10_000.
+        Ok((collateral_value * 10000) / borrow_value)
     }
 }
 
@@ -546,6 +696,49 @@ mod tests {
     extern crate std;
     use super::*;
     use soroban_sdk::testutils::Address as _;
+    use soroban_sdk::testutils::Events as _;
+    use soroban_sdk::{Symbol, TryFromVal};
+
+    #[soroban_sdk::contract]
+    struct MockToken;
+
+    #[soroban_sdk::contracttype]
+    enum MockKey {
+        Bal(Address),
+    }
+
+    #[soroban_sdk::contractimpl]
+    impl MockToken {
+        pub fn mint(env: Env, to: Address, amount: i128) {
+            let current: i128 = env
+                .storage()
+                .instance()
+                .get::<MockKey, i128>(&MockKey::Bal(to.clone()))
+                .unwrap_or(0);
+            env.storage()
+                .instance()
+                .set(&MockKey::Bal(to), &(current + amount));
+        }
+
+        pub fn transfer(env: Env, from: Address, to: Address, amount: i128) {
+            let from_balance: i128 = env
+                .storage()
+                .instance()
+                .get::<MockKey, i128>(&MockKey::Bal(from.clone()))
+                .unwrap_or(0);
+            let to_balance: i128 = env
+                .storage()
+                .instance()
+                .get::<MockKey, i128>(&MockKey::Bal(to.clone()))
+                .unwrap_or(0);
+            env.storage()
+                .instance()
+                .set(&MockKey::Bal(from), &(from_balance - amount));
+            env.storage()
+                .instance()
+                .set(&MockKey::Bal(to), &(to_balance + amount));
+        }
+    }
 
     fn setup() -> (Env, LendingPoolClient<'static>, Address) {
         let env = Env::default();
@@ -558,6 +751,74 @@ mod tests {
         client.initialize(&admin, &8000, &8500, &500, &500, &1000);
 
         (env, client, admin)
+    }
+
+    fn last_event(env: &Env) -> (soroban_sdk::Vec<soroban_sdk::Val>, soroban_sdk::Val) {
+        let events = env.events().all();
+        let event = events.events().last().unwrap();
+        let body = match &event.body {
+            soroban_sdk::xdr::ContractEventBody::V0(v0) => v0,
+        };
+        let mut topics = soroban_sdk::Vec::new(env);
+        for value in body.topics.iter() {
+            topics.push_back(soroban_sdk::Val::try_from_val(env, value).unwrap());
+        }
+        let data = soroban_sdk::Val::try_from_val(env, &body.data).unwrap();
+        (topics, data)
+    }
+
+    fn setup_with_token() -> (Env, LendingPoolClient<'static>, Address, Address) {
+        let (env, client, admin) = setup();
+        let token = env.register(MockToken, ());
+        client.set_collateral_asset(&admin, &token);
+        let user = Address::generate(&env);
+        MockTokenClient::new(&env, &token).mint(&user, &10_000);
+        (env, client, user, token)
+    }
+
+    #[test]
+    fn test_deposit_and_borrow_events_carry_position_snapshots() {
+        let (env, client, user, _token) = setup_with_token();
+
+        let b_tokens = client.deposit(&user, &1000);
+        assert_eq!(b_tokens, 1000);
+
+        let (topics, data) = last_event(&env);
+        let name = Symbol::try_from_val(&env, &topics.get(0).unwrap()).unwrap();
+        assert_eq!(name, symbol_short!("deposit"));
+        let payload =
+            <(i128, i128, i128, i128, i128, i128, i128, i128)>::try_from_val(&env, &data)
+                .unwrap();
+        assert_eq!(payload.0, 1000);
+        assert_eq!(payload.1, 1000);
+        assert_eq!(payload.2, 1000);
+        assert_eq!(payload.3, 0);
+        assert_eq!(payload.4, 0);
+        assert_eq!(payload.5, 1000);
+        assert_eq!(payload.6, 0);
+        assert_eq!(payload.7, 0);
+
+        client.set_collateral(&user, &500);
+        client.borrow(&user, &100);
+
+        let (topics, data) = last_event(&env);
+        let name = Symbol::try_from_val(&env, &topics.get(0).unwrap()).unwrap();
+        assert_eq!(name, symbol_short!("borrow"));
+        let payload =
+            <(i128, i128, i128, i128, i128, i128, i128)>::try_from_val(&env, &data).unwrap();
+        assert_eq!(payload.0, 100);
+        assert_eq!(payload.1, 1000);
+        assert_eq!(payload.2, 100);
+        assert_eq!(payload.3, 500);
+        assert_eq!(payload.4, 1000);
+        assert_eq!(payload.5, 100);
+        assert_eq!(payload.6, 0);
+        assert_eq!(client.get_health_factor(&user), 42_500);
+
+        let position = client.get_position(&user);
+        assert_eq!(position.deposit, 1000);
+        assert_eq!(position.borrow, 100);
+        assert_eq!(position.collateral, 500);
     }
 
     #[test]

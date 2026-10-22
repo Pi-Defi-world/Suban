@@ -233,7 +233,17 @@ impl Stableswap {
 
         env.events().publish(
             (symbol_short!("ss_add"), &provider),
-            (amount_a, amount_b, shares),
+            (
+                amount_a,
+                amount_b,
+                shares,
+                token_a_addr,
+                token_b_addr,
+                reserve_a + amount_a,
+                reserve_b + amount_b,
+                total_shares + shares,
+                amp,
+            ),
         );
 
         Ok(shares)
@@ -278,9 +288,21 @@ impl Stableswap {
         token::Client::new(&env, &token_a_addr).transfer(&vault, &provider, &(amount_a as i128));
         token::Client::new(&env, &token_b_addr).transfer(&vault, &provider, &(amount_b as i128));
 
+        let amp = env.storage().instance().get::<DataKey, u128>(&DataKey::Amplification).unwrap();
+
         env.events().publish(
             (symbol_short!("ss_rm"), &provider),
-            (amount_a as i128, amount_b as i128, shares_in),
+            (
+                amount_a as i128,
+                amount_b as i128,
+                shares_in,
+                token_a_addr,
+                token_b_addr,
+                reserve_a - (amount_a as i128),
+                reserve_b - (amount_b as i128),
+                total_shares - shares_in,
+                amp,
+            ),
         );
 
         Ok((amount_a as i128, amount_b as i128))
@@ -303,7 +325,7 @@ impl Stableswap {
             if token_in == token_a_addr {
                 (DataKey::ReserveA, DataKey::ReserveB, token_b_addr)
             } else if token_in == token_b_addr {
-                (DataKey::ReserveB, DataKey::ReserveA, token_a_addr)
+                (DataKey::ReserveB, DataKey::ReserveA, token_a_addr.clone())
             } else {
                 return Err(StableswapError::InvalidFee);
             };
@@ -340,9 +362,30 @@ impl Stableswap {
         // CEI: update reserves before sending the outbound tokens.
         token::Client::new(&env, &token_out_addr).transfer(&vault, &trader, &amount_out_net);
 
+        let swap_a_to_b = token_in == token_a_addr;
+        let (reserve_a_after, reserve_b_after) = if swap_a_to_b {
+            (reserve_in + amount_in, reserve_out - amount_out_net)
+        } else {
+            (reserve_out - amount_out_net, reserve_in + amount_in)
+        };
+        let token_a_addr: Address = env.storage().instance().get(&DataKey::TokenA).unwrap();
+        let token_b_addr: Address = env.storage().instance().get(&DataKey::TokenB).unwrap();
+
         env.events().publish(
             (symbol_short!("ss_swap"), &trader),
-            (amount_in, amount_out_net),
+            (
+                amount_in,
+                amount_out_net,
+                token_in,
+                token_out_addr,
+                reserve_a_after,
+                reserve_b_after,
+                fee_bps,
+                read_total_shares(&env),
+                token_a_addr,
+                token_b_addr,
+                amp,
+            ),
         );
 
         Ok(amount_out_net)
@@ -409,7 +452,8 @@ mod test {
     extern crate std;
     use super::{Stableswap, StableswapClient, StableswapError};
     use soroban_sdk::{
-        contract, contractimpl, testutils::Address as _, Address, Env,
+        contract, contractimpl, symbol_short, testutils::Address as _,
+        testutils::Events as _, Address, Env, Symbol, TryFromVal,
     };
 
     #[contract]
@@ -434,6 +478,20 @@ mod test {
         pub fn balance(env: Env, account: Address) -> i128 {
             env.storage().instance().get::<MockKey, i128>(&MockKey::Bal(account)).unwrap_or(0)
         }
+    }
+
+    fn last_event(env: &Env) -> (soroban_sdk::Vec<soroban_sdk::Val>, soroban_sdk::Val) {
+        let events = env.events().all();
+        let event = events.events().last().unwrap();
+        let body = match &event.body {
+            soroban_sdk::xdr::ContractEventBody::V0(v0) => v0,
+        };
+        let mut topics = soroban_sdk::Vec::new(env);
+        for value in body.topics.iter() {
+            topics.push_back(soroban_sdk::Val::try_from_val(env, value).unwrap());
+        }
+        let data = soroban_sdk::Val::try_from_val(env, &body.data).unwrap();
+        (topics, data)
     }
 
     fn setup() -> (Env, StableswapClient<'static>, Address, Address, Address) {
@@ -495,6 +553,60 @@ mod test {
         // Stableswap A=100: output > CPMM for same trade (less slippage)
         assert!(out > 9_000);
         assert!(out < 10_000);
+    }
+
+    #[test]
+    fn test_liquidity_event_carries_reserves_and_shares() {
+        let (env, pool, token_a, token_b, _) = setup();
+        let provider = Address::generate(&env);
+        MockTokenClient::new(&env, &token_a).mint(&provider, &100_000);
+        MockTokenClient::new(&env, &token_b).mint(&provider, &100_000);
+
+        let shares = pool.add_liquidity(&provider, &10_000, &10_000, &0);
+
+        let (topics, data) = last_event(&env);
+        let name = Symbol::try_from_val(&env, &topics.get(0).unwrap()).unwrap();
+        assert_eq!(name, symbol_short!("ss_add"));
+        let payload =
+            <(i128, i128, i128, Address, Address, i128, i128, i128, u128)>::try_from_val(
+                &env, &data,
+            )
+            .unwrap();
+        assert_eq!(payload.3, token_a);
+        assert_eq!(payload.4, token_b);
+        assert_eq!(payload.5, 10_000);
+        assert_eq!(payload.6, 10_000);
+        assert_eq!(payload.7, shares);
+        assert_eq!(payload.8, 100);
+    }
+
+    #[test]
+    fn test_swap_event_carries_direction_and_reserves() {
+        let (env, pool, token_a, token_b, _) = setup();
+        let provider = Address::generate(&env);
+        MockTokenClient::new(&env, &token_a).mint(&provider, &100_000);
+        MockTokenClient::new(&env, &token_b).mint(&provider, &100_000);
+        pool.add_liquidity(&provider, &100_000, &100_000, &0);
+        let trader = Address::generate(&env);
+        MockTokenClient::new(&env, &token_a).mint(&trader, &50_000);
+
+        let out = pool.swap(&trader, &token_a, &10_000, &0);
+
+        let (topics, data) = last_event(&env);
+        let name = Symbol::try_from_val(&env, &topics.get(0).unwrap()).unwrap();
+        assert_eq!(name, symbol_short!("ss_swap"));
+        let payload =
+            <(i128, i128, Address, Address, i128, i128, u32, i128, Address, Address, u128)>::try_from_val(
+                &env, &data,
+            )
+            .unwrap();
+        assert_eq!(payload.2, token_a);
+        assert_eq!(payload.3, token_b);
+        assert_eq!(payload.4, 110_000);
+        assert_eq!(payload.5, 100_000 - out);
+        assert_eq!(payload.8, token_a);
+        assert_eq!(payload.9, token_b);
+        assert_eq!(payload.10, 100);
     }
 
     #[test]

@@ -138,25 +138,37 @@ All data routes return `schema_version` and a `freshness` object:
 | `GET /accounts/:accountId` | Indexed account/stub and optional snapshot |
 | `GET /accounts/:id/transactions` | Transactions involving an account |
 | `GET /accounts/:id/operations` | Operations involving an account |
-| `GET /financial/pools` | Pools with event counts and aggregate trade/liquidity activity |
-| `GET /financial/pools/:contractId` | One pool's raw volume, recent events and gap flags |
-| `GET /financial/pools/:contractId/trades` | Normalized swap events (raw amounts) |
-| `GET /financial/pools/:contractId/liquidity` | Add/remove-liquidity events |
+| `GET /financial/pools` | Pools with event counts, latest reserves and derived LP positions |
+| `GET /financial/pools/:contractId` | One pool's state, volume, LP positions and recent events |
+| `GET /financial/pools/:contractId/trades` | Swap events with token direction and post-trade reserves |
+| `GET /financial/pools/:contractId/liquidity` | Add/remove-liquidity events with share totals |
+| `GET /financial/pools/:contractId/lp-positions` | Net LP shares derived from add/remove events |
+| `GET /financial/pools/:contractId/valuation` | Opt-in USD reserves/volume; refuses stale/degraded prices |
+| `GET /financial/lending/events` | Deposit/withdraw/borrow/repay/collateral/liquidation/accrual events |
+| `GET /financial/lending/accounts/:accountId` | Latest indexed lending position snapshot |
+| `GET /financial/lending/summary` | Lending event counts and latest event time |
 | `GET /financial/accounts/:accountId/activity` | Bounded recent financial-event activity |
-| `GET /financial/summary` | Financial event counts and latest event time |
+| `GET /financial/summary` | Pool/lending counts, latest event and coverage flags |
 | `GET /ledgers` | Recent indexed ledgers |
 | `GET /ledgers/:sequence` | One indexed ledger |
 
 Pagination is limit/offset (`limit` max 1000, default 100). Time filters accept
 ISO-8601 or Unix seconds. Response keys are snake_case.
 
-Financial views are projections over the same indexed events. They expose raw
-token amounts and counts, but set `coverage.usd_volume=false` and
-`coverage.lp_positions=false`: the contracts do not emit token direction,
-decimals, reserves or LP balances. Raw volume is never converted to USD with an
-assumed price. Account activity scans at most the 5,000 most recent financial
-events because account addresses are encoded inside topic XDR and cannot be
-filtered in SQL.
+Financial views are projections over the same indexed events. Enriched pool
+events provide token direction, post-trade reserves, fee and total shares;
+lending events provide position snapshots and pool totals. LP positions are
+derived by netting internal add/remove-share events. Legacy events remain
+readable but report missing fields instead of inferring them.
+
+USD valuation is opt-in: set `INDEXER_PRICE_API_URL`, `INDEXER_TOKEN_ASSETS`
+(JSON map of token contract ID to asset ID) and `INDEXER_TOKEN_DECIMALS` (JSON
+map of token contract ID to integer decimals). The valuation route returns
+`503` for stale, non-HEALTHY or unmapped prices and never backfills a historical
+USD-volume series. Account activity scans at most the 5,000 most recent financial
+events, and lending-account lookup scans at most 10,000 recent lending events,
+because account addresses are encoded inside topic XDR and cannot be filtered in
+SQL.
 
 `stale` is true when `lag_ledgers > INDEXER_MAX_LAG_LEDGERS` (default 10), when
 the last successful poll is older than `INDEXER_STALE_AFTER_SECONDS` (default
@@ -264,8 +276,11 @@ The full catalog and alert thresholds are in
   code or bytecode.
 - Full historical backfill from genesis is an operator choice; default bootstraps
   are intentionally small.
-- Financial views do not provide USD volume or LP positions. Contract events
-  carry raw amounts but not token direction/decimals or LP balances; those
-  values remain unavailable rather than inferred.
-- Lending-pool activity has no contract events yet, so `/financial/*` cannot
-  report lending positions or liquidations.
+- The enriched contracts must be deployed and reindexed before their new fields
+  appear in a live database.
+- USD valuation is live-only and opt-in; it is not a historical USD-volume
+  series.
+- LP positions are derived from internal share events, not transferable LP-token
+  balances.
+- Lending positions are indexed snapshots from a bounded scan, not live contract
+  storage.

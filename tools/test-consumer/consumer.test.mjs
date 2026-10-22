@@ -52,14 +52,14 @@ function healthyMock() {
     if (text.includes('/financial/summary')) {
       return json({
         counts: { swap: 4, add_liquidity: 2, remove_liquidity: 1 },
-        coverage: { usd_volume: false, lp_positions: false },
+        coverage: { usd_volume: false, lp_positions: true },
         last_event_at: '2026-10-21T00:00:00.000Z',
       });
     }
     if (text.includes('/financial/pools')) {
       return json({
         data: [{ contract_id: 'CPOOL', pool_kind: 'cpmm' }],
-        coverage: { usd_volume: false, lp_positions: false },
+        coverage: { usd_volume: false, lp_positions: true },
       });
     }
     return json({ error: 'unexpected route' }, 404);
@@ -85,7 +85,7 @@ test('a healthy test user sees provenance, risk and financial coverage', async (
   assert.equal(report.facts.price.confidence_score, 0.91);
   assert.equal(report.facts.price.is_fresh, true);
   assert.equal(report.facts.risk.health_factor, 1.6);
-  assert.equal(report.facts.financial.coverage.lp_positions, false);
+  assert.equal(report.facts.financial.coverage.lp_positions, true);
   assert.equal(report.facts.financial.coverage.usd_volume, false);
   assert.equal(report.checks.length, 5);
   assert.ok(report.checks.every((entry) => entry.ok));

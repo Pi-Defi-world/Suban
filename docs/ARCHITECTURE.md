@@ -134,9 +134,11 @@ Design rules:
   `:3002`.
 - Answers historical queries from SQLite only; no query handler calls Horizon or
   RPC. All data responses carry `schema_version` and `freshness`.
-- Financial projections expose raw swap/liquidity amounts. USD volume and LP
-  positions are explicitly unavailable because current events do not carry
-  token direction/decimals or LP balances.
+- Financial projections use enriched swap/liquidity/lending events. USD volume and LP
+  positions are derived from enriched events; legacy events stay explicitly
+  unenriched. USD valuation is opt-in, live-only and refuses stale/degraded
+  prices. LP positions are netted internal share events, not transferable LP
+  tokens.
 - Owns the contract metadata registry (`contracts`), public API-key quotas,
   webhook outbox/retries and replay checkpoints.
 - Not a source of truth: it is a replayable derived view. A replay from a

@@ -106,11 +106,16 @@ Routes:
 | `GET /accounts/:id` | `accounts` | Stub or full snapshot |
 | `GET /accounts/:id/transactions` | join | Account involvement index |
 | `GET /accounts/:id/operations` | join | Account involvement index |
-| `GET /financial/pools` and `/financial/pools/:id` | `events` | Pool activity derived from swap/liquidity events |
-| `GET /financial/pools/:id/trades` | `events` | Raw swap amounts; token direction/USD value unavailable |
-| `GET /financial/pools/:id/liquidity` | `events` | Add/remove-liquidity events |
-| `GET /financial/accounts/:id/activity` | `events` | Bounded recent activity; not LP positions |
-| `GET /financial/summary` | `events` | Event counts and latest financial event |
+| `GET /financial/pools` and `/financial/pools/:id` | `events` | Pool activity, latest reserves, token direction and derived LP positions |
+| `GET /financial/pools/:id/trades` | `events` | Swap amounts, token direction and post-trade reserves; USD value is opt-in |
+| `GET /financial/pools/:id/liquidity` | `events` | Add/remove-liquidity events with share totals |
+| `GET /financial/pools/:id/lp-positions` | `events` | Net LP shares derived from add/remove events |
+| `GET /financial/pools/:id/valuation` | `events` + price API | Opt-in USD reserves/volume; `503` unless prices are fresh, HEALTHY and configured |
+| `GET /financial/lending/events` | `events` | Deposit/withdraw/borrow/repay/collateral/liquidation/accrual events |
+| `GET /financial/lending/accounts/:id` | `events` | Latest indexed position snapshot for one account |
+| `GET /financial/lending/summary` | `events` | Lending event counts and latest event |
+| `GET /financial/accounts/:id/activity` | `events` | Bounded recent pool activity |
+| `GET /financial/summary` | `events` | Pool and lending event counts plus coverage flags |
 | `GET /ledgers`, `/ledgers/:sequence` | `ledgers` | Indexed ledger history |
 
 Pagination is `limit`/`offset` (`limit` max 1000). Time filters accept ISO-8601
@@ -119,20 +124,32 @@ or Unix seconds. The legacy `/events/contract/:id`, `/events/type/:type` and
 
 ### 4.1 Financial projections (Phase 3, partial)
 
-The `/financial/*` routes project swap and liquidity events into pool, trade and
-activity views. They are deliberately conservative:
+The `/financial/*` routes project enriched swap, liquidity and lending events.
+They remain deliberately conservative:
 
-- `coverage.usd_volume` is `false`. Events contain two raw amounts but not token
-  direction or decimals; no USD conversion is invented.
-- `coverage.lp_positions` is `false`. Current LP-token balances are not indexed.
+- CPMM/stableswap swap events carry token direction, post-trade reserves, fee
+  and total shares. Liquidity events carry token addresses, post-event reserves
+  and total shares.
+- LP positions are derived by netting internal add/remove-share events. The
+  current pool contracts do not support LP-token transfers, so this is exact for
+  them but is not a generic transferable-LP indexer.
+- Lending events carry the account position snapshot and pool totals after each
+  state change. `/financial/lending/accounts/:id` returns the newest snapshot in
+  a bounded scan; it does not read live contract storage.
+- `coverage.usd_volume` is `true` only when `INDEXER_PRICE_API_URL`,
+  `INDEXER_TOKEN_ASSETS` and `INDEXER_TOKEN_DECIMALS` are configured. The
+  valuation route returns `503` for stale, non-HEALTHY or unmapped prices and
+  does not backfill a historical USD-volume series.
+- Legacy events without the enriched tuple remain readable but report missing
+  direction/reserves/LP state rather than inferring them.
 - `GET /financial/accounts/:id/activity` scans at most the 5,000 most recent
   financial events because the account is encoded in topic XDR.
-- Lending-pool events are not emitted by the current contract, so lending
-  positions, liquidations and risk inputs cannot be derived from this service.
+- Lending-account lookup scans at most the 10,000 most recent lending events.
 
-These are Phase 3 gaps, not implied capabilities. The controller's risk API is a
-deterministic calculator over supplied amounts and live prices; it does not read
-on-chain lending positions either.
+These are Phase 3 limits, not implied capabilities. The controller's
+`POST /risk/lending` remains a deterministic calculator over supplied amounts;
+`GET /risk/lending/indexed/:account` reads the indexed snapshot above when
+`DATA_PLATFORM_URL` is configured.
 
 ## 5. Freshness and SLOs
 
@@ -189,10 +206,13 @@ is seeded from deployment config and can be updated through admin routes.
 - No production-sized backfill has been run; default bootstrap windows are
   deliberately small.
 - Contract verification is metadata-only.
-- Financial projections expose raw event amounts only; USD volume and LP
-  positions are not available from current contract events.
-- Lending-pool events are absent, so loan positions and liquidations are not
-  indexed.
+- Enriched financial events require redeploying the updated contracts and
+  reindexing; the existing testnet deployment may still emit legacy payloads.
+- USD valuation is opt-in and live-only; it is not a historical USD-volume
+  series and returns `503` without fresh, HEALTHY, configured prices.
+- LP positions are derived from internal share events, not transferable LP-token
+  balances.
+- Lending positions are bounded indexed snapshots, not live contract storage.
 
 Owner-blocked actions that are intentionally deferred are tracked in
 [`DEFERRED-OWNER-ACTIONS.md`](./DEFERRED-OWNER-ACTIONS.md).
