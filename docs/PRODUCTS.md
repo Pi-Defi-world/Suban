@@ -113,7 +113,7 @@ yet offered. Status values are:
 | Interface | SDK `quoteCpmm` / `CpmmPoolClient.getQuote`; `POST /api/v1/quote/cpmm`; `GET /api/v1/quote/cpmm/:contractId` |
 | Repository | `Suban/sdk`, `suban-controller` |
 | Status | Preview only; Phase 4 gate not met |
-| Limits | Caller-supplied reserves or indexed pool state; no route discovery, no on-chain `get_quote` parity test, no stableswap quote, and no execution or transaction construction. Indexed state can lag the chain. |
+| Limits | Caller-supplied reserves or indexed pool state; no route discovery, no deployed `get_quote` parity test (only a contract-unit vector), no stableswap quote, and no execution or transaction construction. Indexed state can lag the chain. |
 
 ## 3. Value-movement products
 

@@ -14,6 +14,9 @@ gate and has not been matched against on-chain simulation yet.
   reserves and `GET /api/v1/quote/cpmm/:contractId?token_in=...&amount_in=...`
   for the latest indexed pool state. Both label themselves as previews.
 - `suban-controller/src/services/quote.test.ts` covers the HTTP formula inputs.
+- `contracts/cpmm-pool` has a unit test that calls the contract's real
+  `get_quote` view for the shared 1,000,000/1,000,000, 1,000-in, 30-bps vector
+  and asserts 996 out, matching the SDK and HTTP tests.
 
 ## Formula
 
@@ -75,9 +78,10 @@ await fetch(
   or a single indexed pool is named explicitly.
 - **Indexed state can lag.** `GET /quote/cpmm/:contractId` returns the source
   ledger and refuses pools without enriched token/reserve/fee events.
-- **No on-chain parity test.** The pure formula matches the contract source and
-  the unit vectors, but it has not been compared with a deployed `get_quote`
-  simulation on testnet. That comparison is required before claiming 4.1/4.2.
+- **No deployed parity test.** A contract unit test confirms the real
+  `get_quote` view returns the shared preview vector, but the previews have not
+  been compared with a deployed `get_quote` simulation on testnet. That
+  comparison is required before claiming 4.1/4.2.
 - **No stableswap quote.** Only the constant-product pool is covered.
 - **No execution.** No transaction is built, signed or submitted.
 - **No capital.** Nothing here authorizes vaults, liquidation or mainnet funds.

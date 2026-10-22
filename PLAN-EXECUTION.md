@@ -78,7 +78,7 @@ In plain terms:
 | 8.1 Financial data | 🟡 | Pools, trades, liquidity events, LP positions and lending positions are projected from enriched events; USD valuation is opt-in and refuses stale/degraded prices. An internal test-user consumer exists but production usage is absent. |
 | 8.2 Oracle extension | 🟡 | TWAP/volatility, persistent series, provenance and freshness exist; liquidity-aware pricing is not implemented and is marked false. |
 | 8.3 Risk engine | 🟡 | Shared deterministic risk module and `/risk/*` API exist. An opt-in indexed route reads lending position snapshots from the data platform and labels its source and ledger. |
-| 8.4 Execution | ❌ | RPC simulation and SDK swap methods exist; deterministic CPMM previews exist in the SDK and over HTTP (`POST /quote/cpmm`, indexed-state `GET /quote/cpmm/:id`). Route discovery and on-chain simulation parity are not implemented. |
+| 8.4 Execution | ❌ | RPC simulation and SDK swap methods exist; deterministic CPMM previews exist in the SDK and over HTTP (`POST /quote/cpmm`, indexed-state `GET /quote/cpmm/:id`). A contract-unit vector matches the real `get_quote`; route discovery and deployed simulation parity are not implemented. |
 | 8.5 Controller-to-financial integration | 🟡 | Versioned price/statistics/risk contracts and financial event projections exist; an internal test-user consumer exercises them and records coverage/freshness; production usage measurement is still absent. |
 | 8.6 Data quality model | 🟡 | Responses carry price/confidence/sources/freshness/trust and versioned methods; not the full plan metadata model. |
 | 8.7 Oracle trust model | ✅ | Explicit HEALTHY/DEGRADED/BREAKER/RECOVERY state machine with transition history. |
@@ -514,8 +514,8 @@ contracts still need deployment and live indexing.
 **Verification (22 October 2026):**
 
 - Rust workspace: `cargo test --workspace` passes; the targeted CPMM,
-  stableswap and lending-pool run contributes 31 passing tests, including new
-  event-payload and health-factor tests.
+  stableswap and lending-pool run contributes 32 passing tests, including new
+  event-payload, health-factor and shared quote-vector tests.
 - `suban-controller`: `tsc` build passes; 49 Jest tests pass on Node 22 Docker,
   including the data-platform client and CPMM quote tests.
 - `event-indexer`: `tsc` build passes; 17 Vitest tests pass on Node 22 Docker,
@@ -525,8 +525,10 @@ contracts still need deployment and live indexing.
   supported LP positions and an explicit boolean USD-valuation flag.
 - SDK quote preview: `tsc --noEmit` passes; 20 Vitest tests pass, including 6
   deterministic CPMM quote/wiring tests.
-- CI: the previous green runs were `suban-controller` `39615138136` and `Suban`
-  `39621991705`; the new commits must be verified by the next CI run.
+- CI: `suban-controller` run `39800234342` and `Suban` run `39800235670`
+  succeeded for the enriched-data/controller feature commits (SDK, contracts,
+  indexer, consumer, secret scan and security audit jobs green). The final
+  quote-vector/documentation follow-up is verified by the next CI run.
 
 No production consumer, live enriched-contract deployment, historical USD-volume
 series or capital/execution usage is claimed.
@@ -550,12 +552,13 @@ series or capital/execution usage is claimed.
 
 The Phase 4 table below remains the plan. The SDK and HTTP quote previews are a
 partial implementation of 4.1/4.2 only. The HTTP service is deterministic over
-caller-supplied reserves or indexed pool state; it has not been matched against
-on-chain `get_quote` simulation.
+caller-supplied reserves or indexed pool state. A contract unit test confirms
+`get_quote` matches the shared 996-output preview vector, but a deployed testnet
+simulation parity check is still missing.
 
 | # | Task | Deliverable | Acceptance criteria |
 |---|---|---|---|
-| 4.1 | Quote service | Preview in SDK `quoteCpmm`, `CpmmPoolClient.getQuote`, `POST /api/v1/quote/cpmm`, and indexed-state `GET /api/v1/quote/cpmm/:contractId` | Deterministic integer formula tested; on-chain simulation parity and route discovery still missing |
+| 4.1 | Quote service | Preview in SDK `quoteCpmm`, `CpmmPoolClient.getQuote`, `POST /api/v1/quote/cpmm`, and indexed-state `GET /api/v1/quote/cpmm/:contractId` | Deterministic integer formula and contract-level `get_quote` vector tested; deployed simulation parity and route discovery still missing |
 | 4.2 | Simulation API | Preview: deterministic CPMM price impact in SDK and HTTP responses | Reproducible results; RPC preflight simulation not yet built |
 | 4.3 | Route discovery | Only across real liquidity | No synthetic venues |
 | 4.4 | Vault framework (testnet) | Caps, pause, strategy isolation | Deposit/withdraw/pause tests pass |

@@ -137,7 +137,7 @@ capital work is claimed.
 
 | # | Task | Acceptance |
 |---|---|---|
-| 4.1 | Quote service | Deterministic SDK and HTTP CPMM previews; on-chain simulation parity and route discovery still missing |
+| 4.1 | Quote service | Deterministic SDK/HTTP CPMM previews plus a contract-level `get_quote` vector test; deployed simulation parity and route discovery still missing |
 | 4.2 | Simulation API | Reproducible price impact in SDK/HTTP; RPC preflight simulation still missing |
 | 4.3 | Route discovery | Only across real liquidity; no synthetic venues |
 | 4.4 | Vault framework (testnet) | Caps, pause, strategy isolation; deposit/withdraw/pause tests pass |

@@ -626,6 +626,20 @@ mod test {
     }
 
     #[test]
+    fn test_get_quote_matches_shared_preview_vector() {
+        // The SDK and HTTP previews use this same vector:
+        // 1,000,000 / 1,000,000 reserves, 1,000 in, 30 bps -> 996 out.
+        let (env, pool, token_a, token_b, _) = setup();
+        let provider = Address::generate(&env);
+        MockTokenClient::new(&env, &token_a).mint(&provider, &1_000_000);
+        MockTokenClient::new(&env, &token_b).mint(&provider, &1_000_000);
+        pool.add_liquidity(&provider, &1_000_000, &1_000_000, &0);
+
+        assert_eq!(pool.get_quote(&token_a, &1000), 996);
+        assert_eq!(pool.get_quote(&token_b, &1000), 996);
+    }
+
+    #[test]
     fn test_remove_insufficient_shares() {
         let (env, pool, token_a, token_b, _) = setup();
         let provider = Address::generate(&env);

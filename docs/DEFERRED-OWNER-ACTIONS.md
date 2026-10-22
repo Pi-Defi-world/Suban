@@ -173,7 +173,8 @@ contract and indexer code now supports enriched pool/lending events, derived LP
 positions, opt-in USD valuation and indexed risk reads, but live deployment and
 production adoption are not claimed. Phase 3 is **not complete**. Phase 4 is
 limited to SDK/HTTP CPMM quote previews under an explicit gate override; there
-is no on-chain simulation parity or route discovery.
+is no deployed `get_quote` simulation parity or route discovery; the contract
+unit vector is not a substitute for a deployed testnet comparison.
 
 ---
 
