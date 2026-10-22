@@ -527,9 +527,10 @@ contracts still need deployment and live indexing.
 - SDK quote preview: `tsc --noEmit` passes; 20 Vitest tests pass, including 6
   deterministic CPMM quote/wiring tests. The deployed parity script matches the
   live Pi testnet pool in both directions (see Phase 4 verification).
-- CI: `suban-controller` run `39800234342` and `Suban` runs `39800235670` and
-  `39802054351` succeeded, including SDK, contracts, indexer, consumer, secret
-  scan and security audit jobs.
+- CI: `Suban` run `39819955030` (commit `e1e0a32`) and `suban-controller`
+  run `39819953880` (commit `f456aa8`) succeeded, including SDK, contracts,
+  indexer, consumer, route/quote tests, secret scan and security audit jobs.
+  The git-history gitleaks scan remains report-only by design.
 
 No production consumer, live enriched-contract deployment, historical USD-volume
 series or capital/execution usage is claimed.
