@@ -22,7 +22,8 @@ for CPMM pools only. Execution, vaults, liquidation and capital are absent.
   simulation of the deployed `get_quote` view (requires
   `QUOTE_SIMULATION_SOURCE_ACCOUNT`).
 - `GET /api/v1/route/cpmm?token_in=...&token_out=...&amount_in=...[&max_hops=2]`
-  discovers the best CPMM route over enriched indexed pools only (1–3 hops).
+  discovers the best CPMM route over enriched indexed pools only (1–3 hops,
+  bounded to the first 1,000 pool summaries).
 - `suban-controller/src/services/route.test.ts` covers direct/2-hop selection,
   no-liquidity `null`, stableswap exclusion, hop limits and invalid input.
 - `contracts/cpmm-pool` has a unit test that calls the contract's real

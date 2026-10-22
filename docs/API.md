@@ -225,8 +225,9 @@ source ledger. A mismatch is returned as `status: "mismatch"` with a warning.
 
 `GET /api/v1/route/cpmm?token_in=...&token_out=...&amount_in=...[&max_hops=2]`
 discovers the best CPMM route over **indexed** pools only. It considers pools
-that have enriched token/reserve/fee state, excludes stableswap hops, and
-returns `404` when no real indexed route exists. `max_hops` is 1–3. Every hop
+that have enriched token/reserve/fee state (at most the first 1,000 pool
+summaries), excludes stableswap hops, and returns `404` when no real indexed
+route exists. `max_hops` is 1–3. Every hop
 reports its pool, reserves, fee and per-hop integer quote; `sources` reports each
 hop's indexer ledger and observation time. Amounts are raw token units. The
 route is a preview over indexed state and can lag the chain.
