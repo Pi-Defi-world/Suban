@@ -525,10 +525,9 @@ contracts still need deployment and live indexing.
   supported LP positions and an explicit boolean USD-valuation flag.
 - SDK quote preview: `tsc --noEmit` passes; 20 Vitest tests pass, including 6
   deterministic CPMM quote/wiring tests.
-- CI: `suban-controller` run `39800234342` and `Suban` run `39800235670`
-  succeeded for the enriched-data/controller feature commits (SDK, contracts,
-  indexer, consumer, secret scan and security audit jobs green). The final
-  quote-vector/documentation follow-up is verified by the next CI run.
+- CI: `suban-controller` run `39800234342` and `Suban` runs `39800235670` and
+  `39802054351` succeeded, including SDK, contracts, indexer, consumer, secret
+  scan and security audit jobs.
 
 No production consumer, live enriched-contract deployment, historical USD-volume
 series or capital/execution usage is claimed.
