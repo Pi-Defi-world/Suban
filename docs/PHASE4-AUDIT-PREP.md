@@ -93,6 +93,7 @@ Explicitly not claimed:
 | Controller route/quote | Live controller against indexer | Route `96783046`, indexed quote `96783046`, on-chain quote `96783046`, `parity.matches=true` |
 | Test consumer live run | Controller + indexer | `status: ok`, 5/5 checks |
 | Liquidation execution | Bot on Pi testnet | Transaction `ee6ae5c8...` confirmed; post-state recorded |
+| CI | `Suban` run `39956871500` on `0096549` | Green, including the liquidation-bot Node 22 job and working-tree secret scan |
 
 ### Deployed parity detail
 

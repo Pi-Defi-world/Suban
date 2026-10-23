@@ -534,8 +534,9 @@ with measured adoption.
   `27319581`; `/financial/lending/summary` reports deposit/borrow/collateral/
   liquidate events; `/risk/lending/indexed/:account` labels
   `indexed_contract_events` and returns the post-liquidation dust position.
-- CI status is recorded after the commit; the working-tree gitleaks scan is
-  clean on tracked files, while the history scan remains report-only by design.
+- CI: `Suban` run `39956871500` on commit `0096549` is green, including the new
+  `Service services/liquidation-bot` job. The working-tree gitleaks scan passed;
+  the history scan remains report-only and still reports historical findings.
 
 No production consumer, historical USD-volume series or capital/execution usage
 is claimed. External adoption requires a real consumer or an explicit owner
@@ -618,6 +619,9 @@ These are point-in-time formula checks, not execution guarantees.
   transaction above.
 - Audit prep: `docs/PHASE4-AUDIT-PREP.md` contains scope, threat model,
   invariants, test evidence, deployment inventory and known limitations.
+- CI: `Suban` run `39956871500` on commit `0096549` is green, including the
+  liquidation-bot Node 22 job and the working-tree secret scan. The history
+  scan remains report-only.
 
 **Still missing:** stableswap quoting, execution/transaction building,
 production keeper operation, vault capital allocation, an independent audit,
