@@ -210,13 +210,16 @@ is seeded from deployment config and can be updated through admin routes.
 - No production-sized backfill has been run; default bootstrap windows are
   deliberately small.
 - Contract verification is metadata-only.
-- Enriched financial events require redeploying the updated contracts and
-  reindexing; the existing testnet deployment may still emit legacy payloads.
+- The enriched CPMM, stableswap and lending contracts are deployed to Pi
+  testnet and reindexed; older contracts or legacy events may still emit
+  unenriched payloads, which remain explicitly marked as such.
 - USD valuation is opt-in and live-only; it is not a historical USD-volume
   series and returns `503` without fresh, HEALTHY, configured prices.
 - LP positions are derived from internal share events, not transferable LP-token
   balances.
 - Lending positions are bounded indexed snapshots, not live contract storage.
+- Lending projections include only contract names containing `lending`; vault
+  `deposit`/`withdraw` events are excluded from lending counts and positions.
 
 Owner-blocked actions that are intentionally deferred are tracked in
 [`DEFERRED-OWNER-ACTIONS.md`](./DEFERRED-OWNER-ACTIONS.md).

@@ -8,6 +8,8 @@ crate-type = ["cdylib"]
 
 [dependencies]
 soroban-sdk = "27"
+hub-types = { path = "../../crates/hub-types" }
+hub-errors = { path = "../../crates/hub-errors" }
 
 [dev-dependencies]
 soroban-sdk = { version = "27", features = ["testutils"] }

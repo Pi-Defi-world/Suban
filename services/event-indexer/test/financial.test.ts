@@ -15,6 +15,7 @@ const ACCOUNT = 'GB6PCM5GBUZR3EYET4IWQ4TBI7IYPFXFJI4TX3BHDPC6H3PSGB5UYB7W';
 const POOL = 'CCJZ5DGASBWQXR5MP74KZQ6ZJZ3M7N5ZL7QX2X7ZM7ZP5W5Q5X5Q5X5Q';
 const TOKEN_A = StrKey.encodeContract(Buffer.alloc(32, 1));
 const TOKEN_B = StrKey.encodeContract(Buffer.alloc(32, 2));
+const VAULT = StrKey.encodeContract(Buffer.alloc(32, 9));
 
 function topic(value: unknown) {
   return nativeToScVal(value).toXDR('base64');
@@ -213,6 +214,22 @@ describe('financial data projections', () => {
       JSON.stringify([100, 1000, 100, 500, 1000, 100, 0]),
       rawEvent([topic('borrow'), new Address(ACCOUNT).toScVal().toXDR('base64')])
     );
+    // A vault also emits `deposit`; it must not appear in lending projections.
+    db.prepare(
+      `INSERT INTO events
+       (event_id, contract_id, contract_name, event_type, tx_hash, ledger, timestamp, data, raw)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      'E7',
+      VAULT,
+      'strategy-vault',
+      'deposit',
+      'tx7',
+      107,
+      1700000600,
+      JSON.stringify([50, 50, 50, 50]),
+      rawEvent([topic('deposit'), new Address(ACCOUNT).toScVal().toXDR('base64')])
+    );
 
     const detail = await (await fetch(`${base}/financial/pools/${POOL}`)).json();
     expect(detail.data.state).toMatchObject({
@@ -257,6 +274,15 @@ describe('financial data projections', () => {
     expect(lending.coverage.lending_events).toBe(true);
     expect(lending.counts.deposit).toBe(1);
     expect(lending.counts.borrow).toBe(1);
+
+    const lendingEvents = await (
+      await fetch(`${base}/financial/lending/events`)
+    ).json();
+    expect(
+      lendingEvents.data.every(
+        (event: { contract_name: string }) => event.contract_name === 'lending-pool'
+      )
+    ).toBe(true);
   });
 
   it('publishes a valuation only for fresh, healthy, mapped prices', async () => {

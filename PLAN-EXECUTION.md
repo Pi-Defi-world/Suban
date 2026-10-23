@@ -16,7 +16,7 @@ In plain terms:
 
 - **What is real:** RPC, Horizon/API, escrow, the core contract set, the SDK, the four-source price aggregator, the event indexer, persistent price history, TWAP/volatility, a deterministic risk calculator, enriched pool/lending event projections, and the Docker deployment.
 - **What is early:** indexing, historical backfill, contract discovery, controller security, observability, financial consumer integration.
-- **What is paper:** execution and capital, vaults, liquidation network, settlement; liquidity-aware pricing is not implemented. A deterministic CPMM quote preview now exists in the SDK and over HTTP, but it has not been matched against on-chain simulation.
+- **What is paper:** execution and capital, settlement, liquidity-aware pricing; the vault and liquidation work is a testnet prototype, not a production network. A deterministic CPMM quote preview exists in the SDK and over HTTP, and it now matches the enriched deployed pool's on-chain `get_quote` in both directions.
 - **What is broken or overstated:** on-chain oracle publication, bridge mint authorization, secret hygiene, CI coverage of owner-managed deployment.
 - **What is accurate:** Section 3 ("Current State") is a fair description of the repos. The plan's own note at line 258 about missing USDC/USD/oUSD/USDT pricing is correct.
 
@@ -24,7 +24,7 @@ In plain terms:
 
 **Recommendation:** do **not** start Q2–Q4 2027 execution/capital work yet. Run a 90-day "Consolidate" phase first: correctness, security, data persistence, observability, CI, and documentation. The platform's credibility depends on the controller and data layer being trustworthy, not on shipping more contracts.
 
-**Update (23 October 2026):** Phase 0-2 are complete. Phase 3 remains **partial**, but the documented data gaps are now addressed in code: CPMM/stableswap events carry token addresses, post-event reserves and share totals; lending-pool emits deposit/withdraw/borrow/repay/collateral/liquidation/accrual events with position snapshots; the indexer derives LP positions and lending positions; pool lists expose enriched state for route discovery; and an opt-in valuation route refuses stale or degraded prices. An internal **test-user consumer** exercises price provenance, TWAP, risk and financial coverage end-to-end, so the consumer mechanics are demonstrated; production adoption, deployment of the enriched contracts and measured external usage are still absent. Phase 4 has started as a **CPMM quote preview** under an explicit owner-requested gate override: formula parity is now verified against the deployed Pi testnet pool in both directions, and 1–3 hop CPMM route discovery plus a read-only simulation endpoint exist. No execution or capital work is claimed.
+**Update (23 October 2026):** Phase 0-2 are complete. Phase 3's technical/testnet scope is complete: the enriched CPMM, stableswap, oracle-aware lending, oracle and strategy-vault contracts are deployed to Pi testnet and reindexed; enriched pool state, LP positions, lending snapshots and indexed risk reads are live; and the internal **test-user consumer** passed 5/5 live checks. External production adoption and measured third-party usage are still absent, so the production-consumer exit criterion is not claimed. Phase 4 has testnet prototypes for 4.1–4.6 under an explicit owner-requested gate override: deployed `get_quote` parity matches the enriched pool, CPMM route discovery and read-only simulation work, the vault and oracle-aware liquidation were exercised, and a liquidation bot executed one testnet liquidation. The 4.7 audit-preparation package exists, but no auditor is engaged. No mainnet capital, vault allocation or production keeper is authorized.
 
 ---
 
@@ -473,28 +473,30 @@ Status: done ● / partial ◐ / not started ○
 
 **Goal:** make L2 real, but derived from the now-reliable data layer.
 
-Status as of 22 October 2026: **partial**. The calculation/projection layer is
-implemented and tested, and the documented event-data gaps are addressed in the
-contracts and indexer. An internal test-user consumer exercises the public
-routes. The production consumer/exit criterion is not met, and the enriched
-contracts still need deployment and live indexing.
+Status as of 23 October 2026: **technical/testnet scope complete**. The
+calculation/projection layer is implemented and tested, and the documented
+event-data gaps are addressed in the deployed contracts and indexer. The
+enriched CPMM, stableswap, oracle-aware lending, oracle and strategy-vault
+contracts are live on Pi testnet and reindexed. An internal test-user consumer
+passed 5/5 live checks against that deployment. The production
+consumer/exit criterion is **not** met: there is still no external application
+with measured adoption.
 
 | # | Task | Status | Evidence / gap |
 |---|---|---|---|
-| 3.1 | Financial data API | Partial (code-complete) | `/financial/*` pools, trades, liquidity, account activity, summary, `/pools/:id/lp-positions`, `/lending/events`, `/lending/accounts/:id` and `/lending/summary` project enriched events. Pool events carry token direction, post-event reserves and total shares; lending events carry position snapshots and pool totals. USD valuation is opt-in via `/pools/:id/valuation` and returns `503` without fresh, healthy, configured prices. Legacy events remain explicitly unenriched. |
+| 3.1 | Financial data API | Done (testnet) | `/financial/*` pools, trades, liquidity, account activity, summary, `/pools/:id/lp-positions`, `/lending/events`, `/lending/accounts/:id` and `/lending/summary` project enriched events. Pool events carry token direction, post-event reserves and total shares; lending events carry position snapshots and pool totals. The enriched deployment is reindexed and live: the CPMM pool exposes reserve/token/fee state at ledger `27319581`, and the lending projection contains deposit/borrow/collateral/liquidate snapshots. USD valuation is opt-in via `/pools/:id/valuation` and returns `503` without fresh, healthy, configured prices. Legacy events remain explicitly unenriched. |
 | 3.2 | Historical price series | Done | SQLite persistence and `/history`; reopen test proves 30-day-capable storage survives restart. |
 | 3.3 | TWAP and volatility | Done | `twap_volatility_v1`; deterministic pure-function tests; `/statistics`, `/twap`, `/volatility`. |
 | 3.4 | Oracle extension | Partial | Provenance/freshness/confidence/trust and `/methodology` are versioned. Liquidity-aware pricing is not implemented and is marked `false`. |
 | 3.5 | Risk engine v0 | Done | `lending_risk_v1`; deterministic vectors for health factor, collateral value, max borrow and liquidation price. The on-chain lending health-factor formula now returns basis points consistently with its `10_000` threshold. |
 | 3.6 | Risk API | Done (deployment-dependent reader) | `/risk/methods`, `POST /risk/lending`, and opt-in `GET /risk/lending/indexed/:account`. Unknown/unconfigured/missing/stale prices return `404`/`503` without partial fabricated results; fresh non-HEALTHY prices are labelled degraded. The indexed route labels `indexed_contract_events`, exposes the source ledger and can lag the chain. |
-| 3.7 | Consumer integration | Partial | `tools/test-consumer/consumer.mjs` is a deterministic internal test user. It exercises `/price`, `/statistics`, `/risk/lending`, `/financial/summary` and `/financial/pools`, requires freshness/confidence/coverage fields, records a JSON usage report and runs in CI. A live run against the previous indexer passed 5/5 checks; it has not yet been rerun against a deployment of the enriched contracts. Production/external adoption and real usage measurement are still absent. |
+| 3.7 | Consumer integration | Done for internal test user; production adoption absent | `tools/test-consumer/consumer.mjs` is a deterministic internal test user. It exercises `/price`, `/statistics`, `/risk/lending`, `/financial/summary` and `/financial/pools`, requires freshness/confidence/coverage fields, records a JSON usage report and runs in CI. The 23 October 2026 live run against the enriched controller/indexer passed 5/5 checks with `coverage.lp_positions`, `coverage.lending_positions` and `coverage.route_discovery` true; USD valuation was not configured. Production/external adoption and real third-party usage measurement are still absent. |
 
-**Exit criterion:** at least one financial application consumes Suban financial data/oracle services, and freshness/confidence is visible to it. **Partially met by the internal test user; production/external usage is not claimed.** The test user is sufficient to exercise the consumer mechanics for plan execution, but not to claim Phase 3 complete.
+**Exit criterion:** at least one financial application consumes Suban financial data/oracle services, and freshness/confidence is visible to it. **Met for the internal test user; production/external adoption is not claimed.** The test user exercises the consumer mechanics and the enriched deployment, but it is not a third-party product or measured adoption. A production Phase 3 claim still requires an external consumer or an explicit owner waiver.
 
 **Accepted gaps**
 
-- The enriched event payloads are not deployed to the existing testnet contracts
-  yet, so a live indexer only sees enriched data after redeployment/reindexing.
+- External production adoption and third-party usage measurement remain absent.
 - The risk reader depends on the data platform being configured with
   `DATA_PLATFORM_URL`; without it the indexed route returns `503`. It reads
   indexed snapshots, not live contract storage.
@@ -511,29 +513,33 @@ contracts still need deployment and live indexing.
 - Phase 4 is allowed only as a preview under an explicit gate override; no
   execution or capital work is claimed.
 
-**Verification (22 October 2026):**
+**Verification (23 October 2026):**
 
-- Rust workspace: `cargo test --workspace` passes; the targeted CPMM,
-  stableswap and lending-pool run contributes 32 passing tests, including new
-  event-payload, health-factor and shared quote-vector tests.
+- Rust contracts: targeted `cpmm-pool`, `stableswap`, `lending-pool` and
+  `strategy-vault` tests pass: 43 total (10 CPMM, 10 stableswap, 15 lending,
+  8 vault). The lending tests include stale-price rejection, distinct
+  collateral/debt and oracle-priced liquidation.
 - `suban-controller`: `tsc` build passes; 56 Jest tests pass on Node 22 Docker,
   including the data-platform client, CPMM quote and route-discovery tests.
-- `event-indexer`: `tsc` build passes; 17 Vitest tests pass on Node 22 Docker,
+- `event-indexer`: `tsc` build passes; 22 Vitest tests pass on Node 22 Docker,
   including enriched pool, pool-list state, LP-position, lending-position,
-  fresh-price valuation and stale/degraded `503` checks.
-- Test-user consumer: 3 Node contract tests pass; the coverage check now accepts
-  supported LP positions, route discovery and an explicit boolean USD-valuation
-  flag.
-- SDK quote preview: `tsc --noEmit` passes; 20 Vitest tests pass, including 6
-  deterministic CPMM quote/wiring tests. The deployed parity script matches the
-  live Pi testnet pool in both directions (see Phase 4 verification).
-- CI: `Suban` run `39819955030` (commit `e1e0a32`) and `suban-controller`
-  run `39819953880` (commit `f456aa8`) succeeded, including SDK, contracts,
-  indexer, consumer, route/quote tests, secret scan and security audit jobs.
-  The git-history gitleaks scan remains report-only by design.
+  fresh-price valuation, stale/degraded `503`, Soroban value decoding and
+  vault-event exclusion.
+- Test-user consumer: 3 Node contract tests pass; the live run against the
+  enriched controller/indexer passed 5/5 checks with `status: ok`.
+- SDK quote preview: `tsc --noEmit` passes; 20 Vitest tests pass. The deployed
+  parity script matches enriched CPMM `CBN77...` in both directions at ledger
+  `27319628` (`96783046` and `100687090` raw units).
+- Live data checks: `/financial/pools` exposes enriched CPMM state at ledger
+  `27319581`; `/financial/lending/summary` reports deposit/borrow/collateral/
+  liquidate events; `/risk/lending/indexed/:account` labels
+  `indexed_contract_events` and returns the post-liquidation dust position.
+- CI status is recorded after the commit; the working-tree gitleaks scan is
+  clean on tracked files, while the history scan remains report-only by design.
 
-No production consumer, live enriched-contract deployment, historical USD-volume
-series or capital/execution usage is claimed.
+No production consumer, historical USD-volume series or capital/execution usage
+is claimed. External adoption requires a real consumer or an explicit owner
+waiver.
 
 ---
 
@@ -543,52 +549,80 @@ series or capital/execution usage is claimed.
 
 **Gate before starting:** data platform stable, oracle reliable, at least one consumer, no P0/P1 defects open.
 
-**Status (23 October 2026): preview, with 4.1/4.2 formula parity verified against the deployed Pi testnet pool and 4.3 CPMM route discovery implemented.** The owner directed execution to continue without waiting for owner-only actions and to use an internal test user instead of a real consumer. This does **not** satisfy the Phase 4 gate and does **not** authorize capital. The SDK and HTTP CPMM quote preview, the read-only on-chain simulation endpoint and 1–3 hop CPMM route discovery are implemented; no execution, vault, liquidation or capital work is claimed.
+**Status (23 October 2026): testnet prototype under an explicit owner-requested gate override.** The owner directed execution to continue without waiting for owner-only actions and to use an internal test user instead of a real consumer. This does **not** satisfy the Phase 4 gate and does **not** authorize mainnet capital, vault capital allocation or a production keeper. 4.1–4.3 (quote, read-only simulation, CPMM route discovery) are implemented and matched to the enriched deployed pool. 4.4 (vault) and 4.5 (oracle-aware lending/liquidation) were deployed and exercised on Pi testnet. 4.6 (liquidation bot) executed one testnet liquidation. 4.7 is a preparation package; no auditor is engaged.
 
 | Gate item | State |
 |---|---|
 | Data platform stable | Partial: Phase 2 routes/tests pass; public deployment, backfill and capacity are owner actions. |
 | Oracle reliable | Partial: trust states/history are implemented; on-chain push integration test is still missing. |
-| At least one consumer | Internal test user exists and passes live checks; production/external consumer is still absent. |
-| No open P0/P1 defects | Not met: secret rotation and git-history purge are owner-blocked; bridge mint authorization remains gated. |
+| At least one consumer | Internal test user passed 5/5 live checks against the enriched deployment; production/external consumer is still absent. |
+| No open P0/P1 defects | Not met: secret rotation and git-history purge are owner-blocked; bridge mint authorization remains gated. Working-tree secret scan is clean. |
 
-The Phase 4 table below remains the plan. The SDK and HTTP quote previews, the
-read-only simulation endpoint and CPMM route discovery are a partial
-implementation of 4.1–4.3. The HTTP previews are deterministic over
-caller-supplied reserves or indexed pool state. `sdk/scripts/quote-parity.mjs`
-and the controller simulation service matched the deployed Pi testnet pool
-`CBE7DHJDS6HZHVY7AWU42XDUA3WAG7GRFAEYEBRM5J3XG2KUYDBAO2NZ` in both directions
-at ledger 27305287/27305295 (998992 and 995011 raw units). That is point-in-time
-formula parity, not an execution guarantee, and the enriched contracts in this
-repository are still not deployed.
+The Phase 4 table below is implemented only to testnet-prototype depth. The
+HTTP previews are deterministic over caller-supplied reserves or indexed pool
+state. `sdk/scripts/quote-parity.mjs` and the controller simulation service
+matched the enriched Pi testnet CPMM pool
+`CBN77D4T6EPPVHLCNU2XCAEWMRPGTDH67RSGVKKJSIPHT3W23KB6QNCM` in both directions
+at ledger `27319628` (`96783046` and `100687090` raw units). The earlier pool
+`CBE7DHJDS6HZHVY7AWU42XDUA3WAG7GRFAEYEBRM5J3XG2KUYDBAO2NZ` also matched at
+ledger `27305287` (`998992` and `995011` raw units); that run is historical.
+These are point-in-time formula checks, not execution guarantees.
 
-| # | Task | Deliverable | Acceptance criteria |
-|---|---|---|---|
-| 4.1 | Quote service | SDK `quoteCpmm`, `CpmmPoolClient.getQuote`, `POST /api/v1/quote/cpmm`, indexed `GET /api/v1/quote/cpmm/:contractId`, and simulated `GET /api/v1/quote/cpmm/:contractId/onchain` | Deterministic integer formula, contract unit vector and deployed `get_quote` parity in both directions pass; execution-time state guarantees are still absent |
-| 4.2 | Simulation API | Read-only `get_quote` simulation plus deterministic price impact | Reproducible result and parity flag; not wired to transaction building |
-| 4.3 | Route discovery | `GET /api/v1/route/cpmm` over enriched indexed CPMM pools, 1–3 hops | Only real indexed liquidity; stableswap and unenriched pools excluded; `404` when no route exists |
-| 4.4 | Vault framework (testnet) | Caps, pause, strategy isolation | Deposit/withdraw/pause tests pass |
-| 4.5 | Lending hardening | Oracle integration, liquidation tests | Liquidation path tested end-to-end |
-| 4.6 | Liquidation bot prototype | Monitor + execute on testnet | Detects and executes a test liquidation |
-| 4.7 | Audit prep | Scope, threat model, test evidence | Auditor engaged |
+**Testnet deployment inventory (23 October 2026):**
+
+| Component | Contract ID |
+|---|---|
+| Oracle | `CATCIFIYSSMIH7AHZXFXTRPIB2MAKZQCJRZNRP3G4ULOQBBAPIW2SL32` |
+| Oracle-aware lending | `CAKDET6TED6DQWLIPB6ZB2URIVDTFOZKL62ALN5DDUTDN7LDELEKGKRC` |
+| Strategy vault | `CD4RHSQM5IWBIXO6MEN6U4DHEANH6HFSD5FETB3HBMSLGLPXLLW6VMDP` |
+| Enriched CPMM | `CBN77D4T6EPPVHLCNU2XCAEWMRPGTDH67RSGVKKJSIPHT3W23KB6QNCM` |
+| Enriched stableswap | `CD4HZJPLPHMKHMHBZ5VTP4VTISJGXIP7CMCEUG2GZOHCR2EQK5DGM6MC` |
+
+| # | Task | Status | Deliverable | Acceptance criteria |
+|---|---|---|---|---|
+| 4.1 | Quote service | Done (testnet parity) | SDK `quoteCpmm`, `CpmmPoolClient.getQuote`, `POST /api/v1/quote/cpmm`, indexed `GET /api/v1/quote/cpmm/:contractId`, and simulated `GET /api/v1/quote/cpmm/:contractId/onchain` | Deterministic integer formula, contract unit vector and deployed `get_quote` parity in both directions pass; execution-time state guarantees are still absent |
+| 4.2 | Simulation API | Done (read-only) | Read-only `get_quote` simulation plus deterministic price impact | Reproducible result and parity flag; not wired to transaction building |
+| 4.3 | Route discovery | Done (CPMM only) | `GET /api/v1/route/cpmm` over enriched indexed CPMM pools, 1–3 hops | Only real indexed liquidity; stableswap and unenriched pools excluded; `404` when no route exists |
+| 4.4 | Vault framework (testnet) | Done (testnet only) | Caps, pause, strategy isolation | Deposit/withdraw/pause tests pass; deployed vault exercised |
+| 4.5 | Lending hardening | Done (testnet only) | Oracle integration, liquidation tests | Liquidation path tested end-to-end; dust limitation documented |
+| 4.6 | Liquidation bot prototype | Done (one testnet liquidation) | Monitor + execute on testnet | Detects and executes a test liquidation |
+| 4.7 | Audit prep | Prep complete; auditor not engaged | Scope, threat model, test evidence | Auditor engaged |
 
 **Exit criterion:** measurable usage/economic activity justifies one capital/execution product; audit complete before mainnet capital.
 
 **Verification (23 October 2026):**
 
-- `sdk/scripts/quote-parity.mjs` simulated the deployed Pi testnet CPMM pool in
-  both directions: wPi→USDC preview/on-chain `998992`, USDC→wPi `995011`, at
-  ledger `27305287`. The controller's `simulateCpmmQuote` service reproduced the
-  same pair at ledger `27305295`.
+- `sdk/scripts/quote-parity.mjs` simulated enriched CPMM `CBN77...` in both
+  directions: wPi→PUSD preview/on-chain `96783046`, PUSD→wPi `100687090`, at
+  ledger `27319628`.
+- Live controller checks: `/route/cpmm` returned `96783046` at source ledger
+  `27319581`; indexed `/quote/cpmm/:id` returned the same amount; read-only
+  `/quote/cpmm/:id/onchain` returned `96783046` at ledger `27319714` with
+  `parity.matches=true`.
 - Controller build passes; 56 Jest tests pass on Node 22 Docker, including 5
   route-discovery tests and the enriched pool-list parsing test.
-- Indexer build passes; 17 Vitest tests pass on Node 22 Docker.
-- Route discovery consumes `GET /financial/pools` state and excludes
-  stableswap/unenriched pools; it returns `404` rather than a synthetic route.
+- Indexer build passes; 22 Vitest tests pass on Node 22 Docker, including
+  Soroban value decoding and vault-event exclusion from lending projections.
+- Rust contracts: 43 targeted tests pass (10 CPMM, 10 stableswap, 15 lending,
+  8 vault).
+- Vault testnet exercise: deposit `10` PUSD, withdraw `5`, pause blocked a
+  deposit with `Error(Contract, #2)`, withdrawal while paused succeeded,
+  unpause succeeded, first strategy set succeeded and a second set failed with
+  `Error(Contract, #6)`.
+- Lending testnet exercise: health `17000` bps before the wPi price drop and
+  `4250` after; liquidation transaction
+  `ee6ae5c8c0a74ef9e3c0a1fae229bde61f75c26fe7156a707fbacbd51e5d4a36`
+  repaid `952380952` raw PUSD and seized `999999999` raw wPi.
+- Liquidation bot: 18 Vitest tests, typecheck and build pass on Node 22; live
+  dry run detected the health-`4250` position and the execute run produced the
+  transaction above.
+- Audit prep: `docs/PHASE4-AUDIT-PREP.md` contains scope, threat model,
+  invariants, test evidence, deployment inventory and known limitations.
 
-**Still missing:** stableswap quoting, execution/transaction building, vaults,
-lending liquidation hardening, a liquidation bot, audit engagement and any
-capital. 4.4–4.7 are not started.
+**Still missing:** stableswap quoting, execution/transaction building,
+production keeper operation, vault capital allocation, an independent audit,
+mainnet authorization, and a bad-debt/dust policy. 4.7's auditor-engagement
+checkbox is unchecked.
 
 ---
 

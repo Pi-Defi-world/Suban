@@ -10,8 +10,9 @@
  */
 import crypto from 'crypto';
 import Database from 'better-sqlite3';
-import { rpc, scValToNative, xdr } from '@stellar/stellar-sdk';
+import { rpc } from '@stellar/stellar-sdk';
 import { ContractConfig, IndexerConfig } from './config.js';
+import { decodeScVal } from './scval.js';
 import {
   HorizonAccount,
   HorizonClient,
@@ -78,15 +79,6 @@ function collectAccounts(value: unknown, into: Set<string>): void {
     Object.values(value as Record<string, unknown>).forEach((entry) =>
       collectAccounts(entry, into)
     );
-  }
-}
-
-function decodeScVal(value: unknown): unknown {
-  if (typeof value !== 'string') return value;
-  try {
-    return scValToNative(xdr.ScVal.fromXDR(value, 'base64'));
-  } catch {
-    return value;
   }
 }
 

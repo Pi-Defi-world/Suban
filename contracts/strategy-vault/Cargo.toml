@@ -1,0 +1,15 @@
+[package]
+name = "strategy-vault"
+version.workspace = true
+edition.workspace = true
+description = "Testnet-only single-strategy vault framework with caps, pause and strategy isolation."
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+soroban-sdk = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }

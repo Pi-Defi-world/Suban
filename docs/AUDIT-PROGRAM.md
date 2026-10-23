@@ -1,5 +1,16 @@
 # Audit Program — Per-Primitive Security Plan
 
+## Current preparation status
+
+The Phase 4.7 preparation package is [`PHASE4-AUDIT-PREP.md`](./PHASE4-AUDIT-PREP.md).
+It contains scope, threat model, invariants, test evidence, deployment
+inventory and known limitations for the CPMM, stableswap, lending, oracle,
+strategy-vault and liquidation-bot work.
+
+**No auditor has been engaged and no audit report exists.** The table below
+remains the plan; "Pending" means not audited, even where the preparation
+package is complete.
+
 ## Scope
 
 Every contract that touches user funds must be audited before mainnet. The audit program covers:
@@ -14,6 +25,7 @@ Every contract that touches user funds must be audited before mainnet. The audit
 |-----------|-----------|----------|--------|
 | AMM Core | cpmm-pool, stableswap, swap-router, pool-factory, lp-token, liquidity-mining | HIGH | Pending |
 | Lending Core | lending-pool, backstop | CRITICAL | Pending |
+| Vault | strategy-vault | HIGH | Pending |
 | Escrow Core | escrow | HIGH | Pending |
 | Bridge | wpi-token, usdc-vault, bridge-multisig | CRITICAL | Pending |
 | Infrastructure | oracle, pause-registry, fee-router, event-registry, node-staking, identity | MEDIUM | Pending |

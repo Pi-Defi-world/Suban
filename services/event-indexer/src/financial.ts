@@ -18,7 +18,7 @@
  */
 import { Router, Request, Response } from 'express';
 import Database from 'better-sqlite3';
-import { scValToNative, xdr } from '@stellar/stellar-sdk';
+import { decodeScVal } from './scval.js';
 
 type JsonObject = Record<string, unknown>;
 type PoolKind = 'cpmm' | 'stableswap' | 'unknown';
@@ -29,6 +29,8 @@ type LendingEventType =
   | 'borrow'
   | 'repay'
   | 'set_collateral'
+  | 'deposit_collateral'
+  | 'withdraw_collateral'
   | 'liquidate'
   | 'accrue';
 
@@ -47,6 +49,8 @@ const LENDING_EVENT_TYPES = [
   'borrow',
   'repay',
   'set_col',
+  'dep_col',
+  'wd_col',
   'liquidate',
   'accrue',
 ] as const;
@@ -121,22 +125,13 @@ function parseJson(value: unknown, fallback: unknown): unknown {
   }
 }
 
-function decodeTopic(value: unknown): unknown {
-  if (typeof value !== 'string') return value;
-  try {
-    return scValToNative(xdr.ScVal.fromXDR(value, 'base64'));
-  } catch {
-    return value;
-  }
-}
-
 function topicsOf(row: JsonObject): unknown[] {
   const raw = parseJson(row.raw, null);
   if (!raw || typeof raw !== 'object') return [];
   const event = raw as JsonObject;
   const topics = event.topic ?? event.topics;
   if (!Array.isArray(topics)) return [];
-  return topics.map(decodeTopic);
+  return topics.map(decodeScVal);
 }
 
 function isAccount(value: unknown): value is string {
@@ -216,6 +211,10 @@ export function classifyLendingEvent(eventType: string): LendingEventType | null
       return eventType;
     case 'set_col':
       return 'set_collateral';
+    case 'dep_col':
+      return 'deposit_collateral';
+    case 'wd_col':
+      return 'withdraw_collateral';
     default:
       return null;
   }
@@ -309,6 +308,8 @@ export function parseLendingEvent(row: JsonObject): LendingEvent | null {
     case 'borrow':
     case 'repay':
     case 'set_collateral':
+    case 'deposit_collateral':
+    case 'withdraw_collateral':
       snapshot = position(1);
       totalSupply = rawAmount(values[4]);
       totalBorrows = rawAmount(values[5]);
@@ -983,7 +984,9 @@ export function createFinancialRouter(
 
   router.get('/lending/events', (req: Request, res: Response) => {
     const { limit, offset } = page(req);
-    const clause = `event_type IN (${lendingPlaceholders})`;
+    // Vaults also emit `deposit`/`withdraw`; only lending contracts belong in
+    // the lending projection.
+    const clause = `contract_name LIKE '%lending%' AND event_type IN (${lendingPlaceholders})`;
     const rows = eventRows(db, clause, [...LENDING_EVENT_TYPES], limit, offset);
     const total = countRows(db, clause, [...LENDING_EVENT_TYPES]);
     res.json(
@@ -1012,7 +1015,7 @@ export function createFinancialRouter(
     const scanLimit = 10_000;
     const rows = eventRows(
       db,
-      `event_type IN (${lendingPlaceholders})`,
+      `contract_name LIKE '%lending%' AND event_type IN (${lendingPlaceholders})`,
       [...LENDING_EVENT_TYPES],
       scanLimit,
       0
@@ -1063,7 +1066,8 @@ export function createFinancialRouter(
       .prepare(
         `SELECT event_type, COUNT(*) AS count, MAX(timestamp) AS last_timestamp
            FROM events
-          WHERE event_type IN (${lendingPlaceholders})
+          WHERE contract_name LIKE '%lending%'
+            AND event_type IN (${lendingPlaceholders})
           GROUP BY event_type`
       )
       .all(...LENDING_EVENT_TYPES) as Array<{

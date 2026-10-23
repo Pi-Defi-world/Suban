@@ -1,9 +1,12 @@
 # Phase 4 Quote Preview
 
 Status: **preview (23 October 2026)**. This does not satisfy the Phase 4 gate
-and does not authorize capital. 4.1/4.2 now have a deployed `get_quote` parity
-check and a read-only simulation endpoint; route discovery (4.3) is implemented
-for CPMM pools only. Execution, vaults, liquidation and capital are absent.
+and does not authorize capital. 4.1/4.2 now have deployed `get_quote` parity
+checks and a read-only simulation endpoint; route discovery (4.3) is implemented
+for CPMM pools only. Mainnet execution and capital are absent. Testnet vault
+and liquidation prototypes are documented separately in
+[`PHASE4-LIQUIDATION.md`](./PHASE4-LIQUIDATION.md); they do not authorize
+capital or mainnet use.
 
 ## What exists
 
@@ -99,19 +102,35 @@ await fetch(
 
 ## Deployed parity evidence
 
-On 23 October 2026 the parity script was run against the live Pi testnet CPMM
-pool `CBE7DHJDS6HZHVY7AWU42XDUA3WAG7GRFAEYEBRM5J3XG2KUYDBAO2NZ`:
+### Enriched CPMM deployment (current)
+
+On 23 October 2026 the parity script was run against the enriched Pi testnet
+CPMM pool `CBN77D4T6EPPVHLCNU2XCAEWMRPGTDH67RSGVKKJSIPHT3W23KB6QNCM`:
 
 ```text
-reserves = 999003993018961 / 1001000000000000, fee = 30 bps, amount_in = 1000000
-wPi  -> USDC: preview 998992, on-chain 998992 (match, ledger 27305287)
-USDC -> wPi : preview 995011, on-chain 995011 (match, ledger 27305287)
+reserves = 10100000000 / 9901284197, fee = 30 bps, amount_in = 100000000
+wPi  -> PUSD: preview 96783046, on-chain 96783046 (match, ledger 27319628)
+PUSD -> wPi : preview 100687090, on-chain 100687090 (match, ledger 27319628)
 ```
 
-The controller's `simulateCpmmQuote` service reproduced the same pair at ledger
-27305295. This is a point-in-time read of the currently deployed pool; it is
-evidence for formula parity, not a claim that the enriched contracts in this
-repository are deployed or that execution is safe.
+The controller, configured with `DATA_PLATFORM_URL` and
+`QUOTE_SIMULATION_SOURCE_ACCOUNT`, returned:
+
+```text
+GET /api/v1/route/cpmm          amount_out_raw 96783046, source ledger 27319581
+GET /api/v1/quote/cpmm/:id      amount_out_raw 96783046, indexed ledger 27319581
+GET /api/v1/quote/cpmm/:id/onchain
+                                amount_out_raw 96783046, ledger 27319714,
+                                parity.matches = true
+```
+
+### Earlier pool (historical)
+
+An earlier parity run against pool
+`CBE7DHJDS6HZHVY7AWU42XDUA3WAG7GRFAEYEBRM5J3XG2KUYDBAO2NZ` matched at ledger
+27305287 (`998992` and `995011` raw units) before the enriched deployment. That
+run remains evidence for the shared formula, but it is superseded by the
+enriched-pool run above. Both are point-in-time reads, not execution guarantees.
 
 ## Explicit limits
 
@@ -125,7 +144,8 @@ repository are deployed or that execution is safe.
   be rerun after a contract deployment or pool change.
 - **No execution.** No transaction is built, signed or submitted by the quote
   or route endpoints. The simulation endpoint only builds a read-only envelope.
-- **No capital.** Nothing here authorizes vaults, liquidation or mainnet funds.
+- **No capital.** Testnet vault and liquidation prototypes exist, but nothing
+  here authorizes capital, a production keeper or mainnet funds.
 
 ## Verification
 
@@ -143,7 +163,10 @@ On 23 October 2026:
 - SDK `tsc --noEmit` passed and 20 Vitest tests passed on Node 22.
 - Controller `tsc` build passed and 56 Jest tests passed on Node 22 Docker,
   including 5 route-discovery tests and 5 data-platform client tests.
-- Indexer `tsc` build passed and 17 Vitest tests passed on Node 22 Docker,
-  including the pool-list state assertion.
+- Indexer `tsc` build passed and 22 Vitest tests passed on Node 22 Docker,
+  including the pool-list state assertion, `scval` decoding and the
+  vault-event exclusion test.
+- Liquidation bot `tsc` typecheck/build passed and 18 Vitest tests passed on
+  Node 22 Docker.
 - The parity script and the controller simulation service both matched the
-  deployed pool in both directions (see above).
+  enriched deployed pool in both directions (see above).

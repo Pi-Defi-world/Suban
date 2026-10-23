@@ -1,0 +1,24 @@
+{
+  "name": "@suban/liquidation-bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Testnet liquidation bot prototype. Dry-run by default; execution requires an explicit opt-in.",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "scan": "node dist/index.js --once",
+    "dev": "tsx src/index.ts --once",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@stellar/stellar-sdk": "^17.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^1.6.1"
+  }
+}

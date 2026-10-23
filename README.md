@@ -64,6 +64,8 @@ Service quick starts live in each service directory:
 | [DEVELOPER.md](docs/DEVELOPER.md) | Contract addresses, SDK usage and integration notes |
 | [TEST-CONSUMER.md](docs/TEST-CONSUMER.md) | Internal test user for price, risk and financial APIs |
 | [PHASE4-QUOTE-PREVIEW.md](docs/PHASE4-QUOTE-PREVIEW.md) | CPMM quote preview and explicit limits |
+| [PHASE4-LIQUIDATION.md](docs/PHASE4-LIQUIDATION.md) | Testnet vault, oracle-aware lending and liquidation-bot evidence |
+| [PHASE4-AUDIT-PREP.md](docs/PHASE4-AUDIT-PREP.md) | Phase 4.7 audit-preparation package (no auditor engaged) |
 | [PLAN-EXECUTION.md](PLAN-EXECUTION.md) | Current execution plan and honest progress log |
 | [plan.md](plan.md) | Canonical strategy and long-range narrative |
 
@@ -90,7 +92,9 @@ mainnet capital product should be considered safe before the gates in
   before changing a service or contract.
 - Keep changes consistent with the surrounding code and update docs in the same
   change as behavior.
-- Never commit secrets. Gitleaks runs in CI; see
+- Never commit secrets. Local environment and contract values are consolidated
+  into gitignored `.env.local` files by `scripts/sync-local-env.ps1`; the script
+  prints only paths and key counts. Gitleaks runs in CI; see
   [SECRET-ROTATION.md](docs/SECRET-ROTATION.md) if a key is exposed.
 - CI must stay green on `main` for all four repositories.
 

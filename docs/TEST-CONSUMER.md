@@ -52,13 +52,16 @@ values; LP positions are accepted only when the indexer derives them.
 - Node contract tests: `node --test tools/test-consumer/consumer.test.mjs`
   (3 tests: healthy, degraded, malformed).
 - CI job `Test consumer` runs those tests on Node 22.
-- Live run on 21 October 2026 against the previous controller/indexer:
-  `status: ok`, 5/5 checks. The report showed `sample_count: 1`,
-  `annualized_volatility: null`, `coverage.lp_positions: false` and
-  `coverage.usd_volume: false`.
-- On 22 October 2026 the consumer contract was updated to accept derived LP
-  positions and an explicit boolean USD-valuation flag. It must be rerun against
-  a deployment of the enriched contracts before claiming live adoption.
+- Live run on 23 October 2026 against the enriched controller/indexer:
+  `status: ok`, 5/5 checks. The report showed `sample_count: 2`,
+  `annualized_volatility: null`, `coverage.lp_positions: true`,
+  `coverage.route_discovery: true`, `coverage.lending_positions: true` and
+  `coverage.usd_volume: false` (USD valuation is opt-in and was not configured).
+  The financial summary observed one swap and two add-liquidity events; the
+  first pool exposed reserve/token/fee state at ledger `27319581`.
+- This is still an internal test user, not production adoption. The live run
+  proves the consumer mechanics against the enriched deployment; it does not
+  prove external usage or satisfy the production-consumer exit criterion.
 
 ## Limits
 

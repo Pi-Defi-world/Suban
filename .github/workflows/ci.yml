@@ -69,7 +69,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [services/bridge-relayer, services/event-indexer]
+        service: [services/bridge-relayer, services/event-indexer, services/liquidation-bot]
     defaults:
       run:
         working-directory: ${{ matrix.service }}

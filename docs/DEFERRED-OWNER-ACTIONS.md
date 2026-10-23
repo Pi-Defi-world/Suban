@@ -2,7 +2,7 @@
 
 Status: tracked follow-ups, October 2026.
 
-These items are intentionally **not** blocking Phase 2. They either require
+These items are intentionally **not** blocking the testnet Phase 2–4 work. They either require
 owner credentials/approval, a production decision, or a separate engineering
 workstream. They are recorded here so they are not lost or silently claimed as
 done. Do not move an item to "done" based only on code being present.
@@ -24,8 +24,11 @@ history purge.
 4. Do not print or commit any new secret while rotating.
 
 **Current state:** secrets are removed from the current tree; ignored local
-`.env` files may still contain live values. Working-tree gitleaks is blocking;
-history scanning is report-only.
+env files may still contain live values. `scripts/sync-local-env.ps1` consolidates
+the local deployer, faucet, relayer, Arc, controller, indexer and liquidation-bot
+values into gitignored `.env.local` files without printing them. Working-tree
+gitleaks is blocking and clean on tracked files; history scanning is report-only
+and still reports historical findings until rotation and purge are complete.
 
 ## 2. Purge git history
 
@@ -142,7 +145,7 @@ backfill and capacity testing are deployment decisions.
 **Current state:** local and Docker smoke tests pass; public deployment is not
 claimed.
 
-## 9. Deploy enriched financial events and find a production consumer
+## 9. Find a production consumer for enriched financial data
 
 **Owner:** contract deployer/operator plus product/consumer owner.
 
@@ -167,15 +170,37 @@ no production application consumes them with measured usage.
    freshness/confidence and records real usage.
 6. Only then evaluate the Phase 3 exit criterion and the Phase 4 gate.
 
-**Current state:** `tools/test-consumer/consumer.mjs` exercises the APIs and
-records freshness/confidence/coverage; it is not production adoption. The
-contract and indexer code now supports enriched pool/lending events, derived LP
-positions, opt-in USD valuation and indexed risk reads, but live deployment and
-production adoption are not claimed. Phase 3 is **not complete**. Phase 4 is
-limited to CPMM quote/simulation previews and CPMM route discovery under an
-explicit gate override; deployed `get_quote` parity was verified against the
-existing Pi testnet pool on 23 October 2026, but the enriched contracts are not
-deployed and no execution or capital work exists.
+**Current state:** the enriched CPMM, stableswap, oracle-aware lending, oracle
+and strategy-vault contracts are deployed to Pi testnet and reindexed. Live
+checks confirm enriched pool state, LP positions, lending position snapshots,
+`/risk/lending/indexed/:account`, CPMM route discovery and deployed `get_quote`
+parity. `tools/test-consumer/consumer.mjs` passed 5/5 live checks on
+23 October 2026 with `coverage.lp_positions`, `coverage.lending_positions` and
+`coverage.route_discovery` true; USD valuation remains opt-in and was not
+configured. Phase 3's technical/testnet scope is complete. The production
+consumer/exit criterion is **not** met: there is still no external application
+with measured adoption, so do not describe Phase 3 as production-adopted.
+
+Phase 4.4–4.6 testnet prototypes (vault, oracle-aware lending liquidation and
+liquidation bot) are documented in `docs/PHASE4-LIQUIDATION.md`. The 4.7
+preparation package is in `docs/PHASE4-AUDIT-PREP.md`; no auditor is engaged.
+No mainnet capital, vault capital allocation or production keeper is
+authorized.
+
+## 10. Engage an independent auditor
+
+**Owner:** project lead and security owner.
+
+**Why deferred:** the 4.7 package is ready, but selecting and paying an auditor
+is an owner decision. No audit firm has been contacted or engaged.
+
+**Do later:** send `docs/PHASE4-AUDIT-PREP.md` and the contract/test inventory
+to a Soroban-capable auditor, agree scope and access, triage findings, fix
+critical/high issues, and re-test. Keep the audit report and finding status in
+the repository. Do not claim an audit, mainnet readiness or capital safety
+before the report exists.
+
+**Current state:** preparation complete; audit not started.
 
 ---
 

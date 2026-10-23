@@ -10,6 +10,7 @@ members = [
     "contracts/fee-router",
     "contracts/wpi-token",
     "contracts/usdc-vault",
+    "contracts/strategy-vault",
     "contracts/escrow",
     "contracts/lp-token",
     "contracts/cpmm-pool",

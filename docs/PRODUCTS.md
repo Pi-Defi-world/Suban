@@ -101,8 +101,8 @@ yet offered. Status values are:
 | For | Explorers and analytics that need to inspect real swap/liquidity/lending activity |
 | Interface | `/financial/pools`, `/financial/pools/:id`, `/trades`, `/liquidity`, `/pools/:id/lp-positions`, `/pools/:id/valuation`, `/financial/lending/events`, `/financial/lending/accounts/:id`, `/financial/lending/summary`, `/financial/accounts/:id/activity`, `/financial/summary` on the data platform (`:3002`) |
 | Repository | `Suban/services/event-indexer` |
-| Status | Code-complete, deployment-dependent |
-| Limits | Enriched events must be deployed and reindexed. USD valuation is opt-in, live-only and returns `503` for stale/degraded/unmapped prices. LP positions are netted internal share events, not transferable LP tokens. Lending positions are bounded indexed snapshots. No production consumer yet. |
+| Status | Implemented; enriched testnet deployment indexed |
+| Limits | The enriched CPMM/stableswap/lending contracts are deployed and reindexed on Pi testnet, but there is no production consumer. USD valuation is opt-in, live-only and returns `503` for stale/degraded/unmapped prices. LP positions are netted internal share events, not transferable LP tokens. Lending positions are bounded indexed snapshots. |
 
 ### 2.6 CPMM quote preview
 

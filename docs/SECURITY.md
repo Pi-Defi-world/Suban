@@ -81,7 +81,7 @@ Internet ──► public read APIs (controller, API, RPC, indexer)
 | Public data admin route exposed | Contract/webhook tampering | `INDEXER_ADMIN_API_KEY`, constant-time compare, `503` if unset, private network | Implemented |
 | Oracle push failure | Stale on-chain price | Push only after success; failed push does not move breaker reference; metrics | Implemented |
 | Pause-registry not wired | Inability to stop contracts | Pause registry exists but is not called by value-moving contracts | **Open gap** |
-| Contract bug | Loss of funds | Tests, workspace CI, audit program | **Open gap: no independent audit** |
+| Contract bug | Loss of funds | Tests, workspace CI, audit program; Phase 4.7 prep package | **Open gap: no independent audit** |
 
 ## 5. Implemented controls (evidence)
 
@@ -158,7 +158,7 @@ Internet ──► public read APIs (controller, API, RPC, indexer)
 |---|---|---|---|
 | Secret rotation not executed | Compromised keys remain valid | Rotate per `SECRET-ROTATION.md`; revoke old keys | Security lead / owners |
 | Git history not purged | Secrets remain in clones/forks | Approve destructive rewrite, bundle large-binary removal, flip history scan to blocking | Repository owner |
-| No independent audit | Contract bugs may be unknown | Engage auditor; do not deploy mainnet capital | Contracts owner |
+| No independent audit | Contract bugs may be unknown | Send `PHASE4-AUDIT-PREP.md` to an auditor; do not deploy mainnet capital | Contracts owner |
 | Pause registry unwired | Cannot globally pause value-moving contracts | Wire pause checks into contracts that need it; test | Contracts owner |
 | Arc→Stellar mint disabled | Bridge direction unavailable | Implement signer authorization entries and tests | Bridge owner |
 | Dependency audit pending | Known-vulnerable dependency may ship | Production Node audits and Rust audit are in CI; triage report-only full/dev findings | Platform owner |

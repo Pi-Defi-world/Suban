@@ -86,30 +86,30 @@ document does not claim a live public data platform.
 
 **Goal:** make financial data real, but derived from a reliable data layer.
 
-Status: **partial**. The calculation and projection layer is implemented and
-tested, and the documented event-data gaps are addressed in code. An internal
-test-user consumer exercises it, but the enriched contracts are not deployed and
-the production consumer/exit criterion is not met.
+Status: **technical/testnet scope complete**. The calculation and projection
+layer is implemented and tested, and the enriched CPMM, stableswap and lending
+contracts are deployed and reindexed on Pi testnet. An internal test-user
+consumer passed 5/5 live checks. The production consumer/exit criterion is not
+met: there is no external application with measured adoption.
 
 | # | Task | Status | Evidence / gap |
 |---|---|---|---|
-| 3.1 | Financial data API | Partial (code-complete) | `/financial/pools`, `/trades`, `/liquidity`, `/accounts/:id/activity`, `/summary`, `/pools/:id/lp-positions`, `/lending/events`, `/lending/accounts/:id` and `/lending/summary` project enriched events. Pool events carry token direction, reserves and total shares; lending events carry position snapshots. USD valuation is opt-in and returns `503` unless prices are fresh, HEALTHY and configured. Legacy events stay explicitly unenriched. |
+| 3.1 | Financial data API | Done (testnet) | `/financial/pools`, `/trades`, `/liquidity`, `/accounts/:id/activity`, `/summary`, `/pools/:id/lp-positions`, `/lending/events`, `/lending/accounts/:id` and `/lending/summary` project enriched events. Pool events carry token direction, reserves and total shares; lending events carry position snapshots. The enriched deployment is reindexed and live. USD valuation is opt-in and returns `503` unless prices are fresh, HEALTHY and configured. Legacy events stay explicitly unenriched. |
 | 3.2 | Historical price series | Done | SQLite persistence with 30-day retention and `/history`; restart test covers reopen. |
 | 3.3 | TWAP and volatility | Done | `twap_volatility_v1` in `suban-controller/src/services/priceStats.ts`; pure deterministic tests and `/statistics`, `/twap`, `/volatility`. |
 | 3.4 | Oracle extension | Partial | Provenance, confidence, freshness and trust are exposed; `/methodology` is versioned. `liquidity_aware` is explicitly `false`; no pool-depth input exists. |
 | 3.5 | Risk engine v0 | Done | `lending_risk_v1` in `suban-controller/src/services/risk.ts`; deterministic vectors for health factor, collateral, max borrow and liquidation price. The contract health factor now returns basis points and matches its `10_000` threshold. |
 | 3.6 | Risk API | Done (deployment-dependent reader) | `/api/v1/risk/methods`, `POST /api/v1/risk/lending` and opt-in `GET /api/v1/risk/lending/indexed/:account`; unknown/unconfigured/missing/stale prices return `404`/`503` without partial fabricated values; fresh non-HEALTHY prices are labelled degraded. The indexed reader labels its source and ledger. |
-| 3.7 | Consumer integration | Partial | `tools/test-consumer/consumer.mjs` is an internal test user. It checks price provenance, TWAP, risk and financial coverage, records a JSON report and runs in CI. A live run passed 5/5 checks. Production/external usage is still absent. |
+| 3.7 | Consumer integration | Done for internal test user; production adoption absent | `tools/test-consumer/consumer.mjs` is an internal test user. It checks price provenance, TWAP, risk and financial coverage, records a JSON report and runs in CI. The live run against the enriched deployment passed 5/5 checks with LP positions, lending positions and route discovery covered. Production/external usage is still absent. |
 
 **Exit:** at least one financial application consumes Suban financial data or
-oracle services, with freshness/confidence visible to it. Partially met by the
-internal test user; production/external usage is not claimed. Phase 4 is limited
-to a preview under an explicit gate override.
+oracle services, with freshness/confidence visible to it. Met for the internal
+test user; production/external usage is not claimed. A production claim still
+requires an external consumer or an explicit owner waiver.
 
 **Known gaps (accepted, not hidden):**
 
-- Enriched CPMM/stableswap/lending contracts are not deployed yet, so a live
-  indexer sees the new fields only after redeployment and reindexing.
+- There is no external production consumer or third-party adoption measurement.
 - USD valuation is opt-in and live-only; it requires token/price configuration,
   refuses stale/degraded prices, and does not provide a historical USD-volume
   series.
@@ -128,13 +128,14 @@ to a preview under an explicit gate override.
 **Gate:** Phase 3 exit met, data platform stable, oracle reliable, at least one
 consumer, no open P0/P1 defects.
 
-Status: **preview (23 Oct 2026) under an explicit owner-requested gate
-override**. The owner asked to use an internal test user instead of waiting for
-an external consumer and to skip owner-only actions. This does not satisfy the
-gate and does not authorize capital. Deterministic SDK/HTTP CPMM previews,
-read-only deployed `get_quote` simulation and CPMM route discovery exist;
-deployed parity was verified in both directions on 23 Oct 2026. No vault,
-liquidation or capital work is claimed.
+Status: **testnet prototype (23 Oct 2026) under an explicit owner-requested
+gate override**. The owner asked to use an internal test user instead of waiting
+for an external consumer and to skip owner-only actions. This does not satisfy
+the gate and does not authorize mainnet capital, vault allocation or a
+production keeper. Deterministic SDK/HTTP CPMM previews, read-only deployed
+`get_quote` simulation and CPMM route discovery exist and match the enriched
+pool. The vault, oracle-aware lending and liquidation bot were exercised on Pi
+testnet. The audit-preparation package exists; no auditor is engaged.
 
 | # | Task | Acceptance |
 |---|---|---|
@@ -145,6 +146,11 @@ liquidation or capital work is claimed.
 | 4.5 | Lending hardening | Oracle integration and liquidation tests end-to-end |
 | 4.6 | Liquidation bot prototype | Detects and executes a test liquidation on testnet |
 | 4.7 | Audit prep | Scope, threat model, test evidence, auditor engaged |
+
+Implementation status: 4.1–4.3 are done for CPMM/testnet and matched to the
+enriched pool; 4.4 is a deployed testnet vault; 4.5 is deployed oracle-aware
+lending with one testnet liquidation; 4.6 executed one testnet liquidation; 4.7
+preparation is complete but the auditor-engagement checkbox is unchecked.
 
 **Exit:** measurable usage justifies one capital/execution product; audit
 complete before any mainnet capital.
