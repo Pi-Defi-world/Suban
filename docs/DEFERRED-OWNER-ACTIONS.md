@@ -149,26 +149,22 @@ claimed.
 
 **Owner:** contract deployer/operator plus product/consumer owner.
 
-**Why deferred:** the Phase 3 projection and risk layers are implemented in
-code, but the existing testnet contracts must be redeployed and reindexed before
-the enriched payloads are visible. An internal test user exercises the APIs, but
-no production application consumes them with measured usage.
+**Why deferred:** the enriched contracts are deployed and the internal test
+user passes, but no external application consumes the APIs with measured usage.
+Finding, onboarding and measuring a production consumer is a product/owner
+action, not a code change.
 
 **Do later:**
 
-1. Deploy the updated CPMM, stableswap and lending-pool contracts with the
-   enriched event payloads.
-2. Reindex the deployment window and verify `/financial/pools/:id` returns
-   token/reserve/share state, `/financial/pools/:id/lp-positions` derives LP
-   shares, and `/financial/lending/accounts/:id` returns position snapshots.
-3. If USD valuation is required, configure `INDEXER_PRICE_API_URL`,
+1. Find a production consumer that displays freshness/confidence and records
+   real usage.
+2. If USD valuation is required, configure `INDEXER_PRICE_API_URL`,
    `INDEXER_TOKEN_ASSETS` and `INDEXER_TOKEN_DECIMALS`; verify stale or
    non-HEALTHY prices return `503` instead of a USD value.
-4. Configure `DATA_PLATFORM_URL` on the controller and verify
-   `/risk/lending/indexed/:account` labels its ledger and source.
-5. Replace the internal test user with a production consumer that displays
-   freshness/confidence and records real usage.
-6. Only then evaluate the Phase 3 exit criterion and the Phase 4 gate.
+3. If the consumer needs new contracts or events, redeploy and reindex, then
+   re-run the live enriched-state and quote-parity checks.
+4. Record the external usage evidence and only then evaluate the production
+   Phase 3 exit criterion and the Phase 4 gate.
 
 **Current state:** the enriched CPMM, stableswap, oracle-aware lending, oracle
 and strategy-vault contracts are deployed to Pi testnet and reindexed. Live
