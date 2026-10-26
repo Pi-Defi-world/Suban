@@ -48,9 +48,12 @@ the security gates are met.
   engaged** and no audit report exists.
 - **Phase 4 gate:** not satisfied. No mainnet capital, vault capital allocation
   or production keeper is authorized.
-- **Latest CI:** `Suban` run `39957917792` on `0b46fa3` is green. The controller
-  run `39820587698` on `d0db18d` is green. `Suban-api` and `suban-rpc` latest
-  runs are green, with the RPC preflight caveat noted below.
+- **Latest CI:** `Suban` run `40361766711` on `04a5ea3` is green. The preceding
+  docs-only run `40360487990` on `42004e3` failed on two new dependency
+  advisories; both were fixed in `04a5ea3` (indexer `body-parser` upgrade and a
+  documented `RUSTSEC-2026-0387` exception). The controller run `39820587698`
+  on `d0db18d` is green. `Suban-api` and `suban-rpc` latest runs are green, with
+  the RPC preflight caveat noted below.
 - **Local runtime at the last check:** the event indexer container
   `suban-indexer-phase3` was running on port `3102`; the controller was not
   listening on port `3101`. This is a local verification environment, not a
@@ -350,7 +353,7 @@ Verified on 23 October 2026 unless noted:
 | SDK | 20 Vitest tests |
 | Liquidation bot | 18 Vitest tests |
 | Test consumer | 3 Node tests plus 5/5 live checks |
-| CI | `Suban` run `39957917792` on `0b46fa3` green; controller run `39820587698` on `d0db18d` green |
+| CI | `Suban` run `40361766711` on `04a5ea3` green; controller run `39820587698` on `d0db18d` green |
 
 ## 7. What is not production-ready
 

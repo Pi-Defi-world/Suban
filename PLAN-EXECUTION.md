@@ -26,6 +26,8 @@ In plain terms:
 
 **Current build inventory:** see [`docs/PROJECT-STATUS.md`](docs/PROJECT-STATUS.md) for every contract, crate, service, SDK, frontend, CI job, deployment ID and verified limit.
 
+**CI update (26 October 2026):** `Suban` run `40361766711` on `04a5ea3` is green after upgrading the event indexer's transitive `body-parser` to `1.20.9` and recording `RUSTSEC-2026-0387` (`crypto-bigint 0.5.5` via `k256 0.13` / `soroban-env-host 27.0.1`) as an explicit, documented exception in `.cargo/audit.toml` and CI. The preceding docs-only run failed on those two new advisories; they are not being silently ignored.
+
 **Update (23 October 2026):** Phase 0-2 are complete. Phase 3's technical/testnet scope is complete: the enriched CPMM, stableswap, oracle-aware lending, oracle and strategy-vault contracts are deployed to Pi testnet and reindexed; enriched pool state, LP positions, lending snapshots and indexed risk reads are live; and the internal **test-user consumer** passed 5/5 live checks. External production adoption and measured third-party usage are still absent, so the production-consumer exit criterion is not claimed. Phase 4 has testnet prototypes for 4.1–4.6 under an explicit owner-requested gate override: deployed `get_quote` parity matches the enriched pool, CPMM route discovery and read-only simulation work, the vault and oracle-aware liquidation were exercised, and a liquidation bot executed one testnet liquidation. The 4.7 audit-preparation package exists, but no auditor is engaged. No mainnet capital, vault allocation or production keeper is authorized.
 
 ---
