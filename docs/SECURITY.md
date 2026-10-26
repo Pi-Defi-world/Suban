@@ -142,6 +142,12 @@ Internet ──► public read APIs (controller, API, RPC, indexer)
   are clean at production level; the controller was upgraded to
   `@stellar/stellar-sdk@17.2.1` with patched `axios`, `proxy-addr`, `form-data`
   and `path-to-regexp`.
+- Rust audit has one explicit, tracked exception: `RUSTSEC-2026-0387`
+  (`crypto-bigint 0.5.5` via `k256 0.13.4` / `soroban-env-host 27.0.1`). The
+  patched release is `crypto-bigint >= 0.7.6`, a semver-incompatible major that
+  the current `k256 0.13` line cannot consume. The exception is recorded in
+  `.cargo/audit.toml` and the CI `ignore` input; it must be revisited when the
+  Soroban dependency line updates.
 - Controller uses Node 22+ for `better-sqlite3` prebuilt compatibility.
 
 ### 5.5 Operations
@@ -162,6 +168,7 @@ Internet ──► public read APIs (controller, API, RPC, indexer)
 | Pause registry unwired | Cannot globally pause value-moving contracts | Wire pause checks into contracts that need it; test | Contracts owner |
 | Arc→Stellar mint disabled | Bridge direction unavailable | Implement signer authorization entries and tests | Bridge owner |
 | Dependency audit pending | Known-vulnerable dependency may ship | Production Node audits and Rust audit are in CI; triage report-only full/dev findings | Platform owner |
+| `RUSTSEC-2026-0387` accepted temporarily | `crypto-bigint 0.5.5` timing variability in the Soroban host dependency chain | No compatible patched major in `k256 0.13`; tracked in `.cargo/audit.toml` and CI. Upgrade when Soroban/k256 publish a compatible release | Platform owner |
 | Data-platform public deployment not provisioned | No live public endpoint/backfill | DNS/TLS, key policy, private metrics, production backfill and load test | SRE owner |
 | Webhook signing secrets in SQLite | DB read exposes webhook secrets | Restrict file permissions, backup encryption, rotate per subscription | Indexing owner |
 | `suban-rpc` preflight protocol mismatch | Contract-state preflight tests not in the gate | Upgrade host to protocol 25 or keep the documented compatibility limit | RPC owner |

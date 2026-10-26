@@ -365,6 +365,10 @@ Verified on 23 October 2026 unless noted:
 - Public data-platform deployment at `data.suban.org` is not provisioned.
 - Secret rotation and git-history purge remain owner actions. Working-tree
   gitleaks is clean; history scanning still reports historical findings.
+- Rust audit has one explicit tracked exception, `RUSTSEC-2026-0387`
+  (`crypto-bigint 0.5.5` via `k256 0.13.4` / `soroban-env-host 27.0.1`). The
+  patched release is a semver-incompatible major; see `.cargo/audit.toml` and
+  `docs/SECURITY.md`.
 - Arc -> Stellar mint remains disabled pending signer authorization entries.
 - Named maintainers remain `TBD`.
 - `suban-rpc` preflight simulation tests are gated by a host/protocol mismatch

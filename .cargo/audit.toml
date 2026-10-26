@@ -1,0 +1,15 @@
+# cargo-audit configuration.
+#
+# RUSTSEC-2026-0387 affects crypto-bigint 0.5.5, which is pulled in
+# transitively by k256 0.13.4 -> elliptic-curve 0.13.8 ->
+# soroban-env-host 27.0.1. The patched release is crypto-bigint >= 0.7.6,
+# a semver-incompatible major that k256 0.13 cannot consume. There is no
+# compatible upgrade in the current soroban-sdk 27 dependency line.
+#
+# This is an explicit, tracked exception, not a claim that the advisory is
+# harmless. Revisit when soroban-env-host/k256 publish a compatible release,
+# or when the workspace moves to a newer Soroban dependency line.
+[advisories]
+ignore = [
+  "RUSTSEC-2026-0387",
+]
