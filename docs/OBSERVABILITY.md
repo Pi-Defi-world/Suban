@@ -1,6 +1,6 @@
 # Suban Observability
 
-Status: canonical observability guide (Phase 2, October 2026).
+Status: canonical observability guide (Phase 2-4, October 2026). For the current build and deployment inventory, see [PROJECT-STATUS.md](./PROJECT-STATUS.md).
 
 All four runtime services expose Prometheus metrics and a health endpoint. The
 observability pack in [`ops/observability/`](../ops/observability/) runs

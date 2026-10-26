@@ -1,6 +1,6 @@
 # Suban API
 
-Status: canonical API index (Phase 2, October 2026).
+Status: canonical API index (Phase 2-4, October 2026). For build/deployment status, see [PROJECT-STATUS.md](./PROJECT-STATUS.md).
 
 This is the entry point for API consumers. Detailed per-service documents are
 linked below; when they disagree with this index, the service document wins for

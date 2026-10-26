@@ -1,6 +1,6 @@
 # Suban Products and Capabilities
 
-Status: canonical product catalog (Phase 2, October 2026).
+Status: canonical product catalog (Phase 2-4, October 2026). For the current build and deployment inventory, see [PROJECT-STATUS.md](./PROJECT-STATUS.md).
 
 This document describes what Suban offers today and what is intentionally not
 yet offered. Status values are:

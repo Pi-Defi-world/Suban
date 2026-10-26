@@ -1,6 +1,6 @@
 # Suban Roadmap
 
-Status: canonical roadmap (Phase 2, October 2026).
+Status: canonical roadmap (Phase 2-4, October 2026). For the current build and deployment inventory, see [PROJECT-STATUS.md](./PROJECT-STATUS.md).
 
 Suban is sequenced **risk removal → data → financial products → execution and
 capital**. Later phases are gated by earlier exit criteria; they are not

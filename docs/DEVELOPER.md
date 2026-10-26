@@ -38,21 +38,39 @@ const pools = await factory.listPools();
 
 ## Contract Addresses (Pi Testnet)
 
-### Core Contracts
+### Current enriched deployment (23 October 2026)
+
+Use these addresses for new integration and testnet verification work.
+
+| Contract | Address | Purpose |
+|----------|---------|---------|
+| CPMM Pool (wPi/PUSD) | `CBN77D4T6EPPVHLCNU2XCAEWMRPGTDH67RSGVKKJSIPHT3W23KB6QNCM` | Constant-product AMM with enriched events |
+| Stableswap | `CD4HZJPLPHMKHMHBZ5VTP4VTISJGXIP7CMCEUG2GZOHCR2EQK5DGM6MC` | Curve-like stableswap with enriched events |
+| Lending Pool | `CAKDET6TED6DQWLIPB6ZB2URIVDTFOZKL62ALN5DDUTDN7LDELEKGKRC` | Oracle-aware lending with liquidation |
+| Oracle | `CATCIFIYSSMIH7AHZXFXTRPIB2MAKZQCJRZNRP3G4ULOQBBAPIW2SL32` | On-chain price feeds |
+| Strategy Vault | `CD4RHSQM5IWBIXO6MEN6U4DHEANH6HFSD5FETB3HBMSLGLPXLLW6VMDP` | Testnet single-strategy vault |
+| wPi Token | `CCODZXYOZMKBOKCCMOKSVW3FIGPJRILM7GH4MKFOS4IWZ56EBX5MVONV` | Wrapped Pi |
+| PUSD Token | `CAPDFYOFXSQTVCZ7KPUACHVNMOO3TWLSLHTPQ3H64EBJVRFMAWIBEUAY` | PUSD stablecoin |
+
+The earlier CPMM, stableswap, lending and oracle deployments were superseded by
+this enriched set. See `docs/PROJECT-STATUS.md` for the historical address list.
+
+### Earlier testnet contracts (historical)
+
+These addresses are retained for older integrations and were not re-verified
+during the enriched deployment.
 
 | Contract | Address | Purpose |
 |----------|---------|---------|
 | Pool Factory | `CCQKGU54YX6UBHRANG4JNDR3TMDA4HGJ4NLP5KGJC2JLQRGUC7KIMOAW` | AMM pool factory |
 | Backstop | `CD4HGZAQN5C2O53K2OMV5HTDSJNJM56V7X6CGBIOJJ2A3QMV7FPYNMRX` | Emergency backstop |
-| Lending Pool | `CAZETGC2BYWX5KY653BF4J2WDXFTAQAKSW7CBKDEJVXJG2KRBOHXLJXI` | DeFi lending |
-| Oracle | `CBLQKWBP2TV3CPM26DDNMEMDEMLGYAJHJ5O2ZM4UD32OVXBOCA25DE3M` | On-chain price feeds |
+| Earlier Lending Pool | `CAZETGC2BYWX5KY653BF4J2WDXFTAQAKSW7CBKDEJVXJG2KRBOHXLJXI` | DeFi lending (superseded) |
+| Earlier Oracle | `CBLQKWBP2TV3CPM26DDNMEMDEMLGYAJHJ5O2ZM4UD32OVXBOCA25DE3M` | On-chain price feeds (superseded) |
 | Escrow Manager | `CC3JNU7LAGOLF5TAZ2BP23ZDFSDMVM6IR7O3MWHGM65QII3UINQNM4EU` | Milestone-based escrow |
-| CPMM Pool (wPi/MockUSDC) | `CBE7DHJDS6HZHVY7AWU42XDUA3WAG7GRFAEYEBRM5J3XG2KUYDBAO2NZ` | Constant-product AMM |
-| Stableswap | `CAETZYW4ADMRCQIVLONFTAEP4WQGIVP2V5DZ7XXSPPVEK5CNHXOJOHMX` | Curve-like stableswap |
+| Earlier CPMM Pool (wPi/MockUSDC) | `CBE7DHJDS6HZHVY7AWU42XDUA3WAG7GRFAEYEBRM5J3XG2KUYDBAO2NZ` | Constant-product AMM (superseded) |
+| Earlier Stableswap | `CAETZYW4ADMRCQIVLONFTAEP4WQGIVP2V5DZ7XXSPPVEK5CNHXOJOHMX` | Curve-like stableswap (superseded) |
 | Swap Router | `CA3AECFKZSGBODPXWWTOBVKUEWQLAGWAIO5E2RMAAVYMLCERSSEU4KYZ` | Multi-hop swaps |
 | Liquidity Mining | `CDC6LFSPVE7XOAAVU2JBUQQNFHAAIH2DESW4M4KU6KXS2I2CHFFGA555` | Yield farming |
-| wPi Token | `CCODZXYOZMKBOKCCMOKSVW3FIGPJRILM7GH4MKFOS4IWZ56EBX5MVONV` | Wrapped Pi |
-| MockUSDC | `CAPDFYOFXSQTVCZ7KPUACHVNMOO3TWLSLHTPQ3H64EBJVRFMAWIBEUAY` | PUSD stablecoin |
 
 ### Bridge Contracts
 

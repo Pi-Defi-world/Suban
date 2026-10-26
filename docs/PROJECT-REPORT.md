@@ -1,7 +1,14 @@
 # PUSD Stablecoin Project — Comprehensive Report
 
+> **Historical report (28 September 2026).** Some addresses, container counts
+> and deployment claims below are superseded. For the current project status,
+> build inventory and verified testnet addresses, use
+> [`PROJECT-STATUS.md`](./PROJECT-STATUS.md) and
+> [`PLAN-EXECUTION.md`](../PLAN-EXECUTION.md). Treat this document as historical
+> context, not as the current deployment source of truth.
+
 **Date:** September 28, 2026  
-**Status:** Testnet (E2E Bridge Verified)  
+**Status:** Historical testnet report (see current status above)
 **Project:** Suban Data Platform + PUSD Stablecoin  
 **Website:** https://suban.org
 

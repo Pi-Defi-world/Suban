@@ -1,6 +1,6 @@
 # Suban Data Platform
 
-Status: canonical data-platform architecture (Phase 2 complete, Phase 3 financial projections partial, October 2026).
+Status: canonical data-platform architecture (Phase 2 complete; Phase 3 technical/testnet scope complete; October 2026). For the current build and deployment inventory, see [PROJECT-STATUS.md](./PROJECT-STATUS.md).
 
 The data platform is the indexed-data layer behind Suban's developer promise:
 consume Pi and Suban data without running a node. It is **implemented and

@@ -1,6 +1,6 @@
 # Suban Ownership Matrix
 
-Status: canonical ownership map (Phase 2, October 2026).
+Status: canonical ownership map (Phase 2-4, October 2026). For the current build and deployment inventory, see [PROJECT-STATUS.md](./PROJECT-STATUS.md).
 
 Every module has **one accountable role** and **one deployment target**. The
 role is accountable until a named maintainer is recorded in the repository's
@@ -29,8 +29,8 @@ not yet been recorded; that is an open action, not an orphan module.
 | PUSD bridge relayer | `Suban/services/bridge-relayer` | Bridge owner | TBD | Internal worker; metrics `:9464` | `docs/OBSERVABILITY.md`, `docs/INCIDENT-RUNBOOK.md` | Implemented; gated |
 | RPC | `suban-rpc` | RPC owner | TBD | `rpc.suban.org`, `testrpc.suban.org` (ports `8000`/`8001`) | `suban-rpc` README + monitoring stack | Implemented |
 | Horizon-compatible data API | `Suban-api` | Data API owner | TBD | `horizon.suban.org` (`:4000`) | `docs/API.md`, `docs/OBSERVABILITY.md` | Implemented |
-| Market data + oracle controller | `suban-controller` | Oracle owner | TBD | `oracle.suban.org` (`:3000`) | `suban-controller/docs/API.md`, `docs/OBSERVABILITY.md` | Implemented; TWAP/volatility and risk calculator; oracle push opt-in |
-| Data platform (`event-indexer`) | `Suban/services/event-indexer` | Indexing owner | TBD | `data.suban.org` (target; not yet provisioned); local `:3002` | `docs/DATA-PLATFORM.md`, `docs/OBSERVABILITY.md` | Implemented; financial projections partial; testnet/experimental |
+| Market data + oracle controller | `suban-controller` | Oracle owner | TBD | `oracle.suban.org` (`:3000`) | `suban-controller/docs/API.md`, `docs/OBSERVABILITY.md` | Implemented; TWAP/volatility, risk calculator, quote/route previews; oracle push opt-in |
+| Data platform (`event-indexer`) | `Suban/services/event-indexer` | Indexing owner | TBD | `data.suban.org` (target; not yet provisioned); local `:3002` | `docs/DATA-PLATFORM.md`, `docs/OBSERVABILITY.md` | Implemented; enriched testnet deployment indexed; no production consumer |
 | SDK | `Suban/sdk` | SDK owner | TBD | Published package `@suban/sdk` (release artifact) | `sdk` tests (`vitest`), `docs/DEVELOPER.md` | Implemented; pre-1.0 |
 | Escrow viewer | `Suban/frontend/escrow-viewer` | Frontend owner | TBD | `testnet.suban.org` (testnet-facing frontend) | Vite build; read-only viewer | Experimental |
 | Deployment + observability stack | `Suban/deploy`, `Suban/ops/observability` | SRE owner | TBD | Docker Compose / Pi node stack; Prometheus + Grafana | `docs/OBSERVABILITY.md`, `docs/INCIDENT-RUNBOOK.md` | Implemented |

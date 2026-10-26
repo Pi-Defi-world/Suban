@@ -1,6 +1,6 @@
 # Suban Architecture
 
-Status: canonical platform architecture (Phase 2 complete, Phase 3 partial, October 2026).
+Status: canonical platform architecture (Phase 2 complete; Phase 3 technical/testnet scope complete; Phase 4 testnet prototypes, October 2026). For the current build and deployment inventory, see [PROJECT-STATUS.md](./PROJECT-STATUS.md).
 
 This document explains how the Suban repositories and services fit together. It
 is the entry point for new contributors and integrators; deep-dive documents are

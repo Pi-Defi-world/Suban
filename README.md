@@ -6,7 +6,9 @@ and oracle publication, escrow, and a gated cross-chain bridge.
 Suban is built as small, independently deployable services rather than one
 monolith. Start with the [architecture](docs/ARCHITECTURE.md) and
 [product catalog](docs/PRODUCTS.md); use the [API index](docs/API.md) to
-integrate.
+integrate. For the current build inventory, deployment IDs and honest
+production/testnet classification, see
+[PROJECT-STATUS.md](docs/PROJECT-STATUS.md).
 
 ## Repositories
 
@@ -53,6 +55,7 @@ Service quick starts live in each service directory:
 
 | Document | Purpose |
 |---|---|
+| [PROJECT-STATUS.md](docs/PROJECT-STATUS.md) | Current project status, all builds, deployment IDs and verified limits |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Repositories, service boundaries, data flows, trust boundaries |
 | [DATA-PLATFORM.md](docs/DATA-PLATFORM.md) | Indexed schema, historical API, freshness, replay, keys and webhooks |
 | [PRODUCTS.md](docs/PRODUCTS.md) | Capability catalog with status and limits |
@@ -80,11 +83,15 @@ Operational runbooks:
 
 ## Status
 
-Suban is testnet-first. The controller, data API, indexer and relayer are
-implemented and observable; the bridge supports Stellar→Arc on testnet, while
-Arc→Stellar minting is disabled until signer authorization entries exist. No
-mainnet capital product should be considered safe before the gates in
-[ROADMAP.md](docs/ROADMAP.md) and `AUDIT-PROGRAM.md` are met.
+Suban is testnet-first. Phase 0-2 are complete. Phase 3's technical/testnet
+scope is complete, but there is no external production consumer. Phase 4.1-4.6
+exist as testnet prototypes (quotes/routes, vault, oracle-aware lending and a
+liquidation bot); Phase 4.7 is an audit-preparation package and **no auditor is
+engaged**. The bridge supports Stellar→Arc on testnet, while Arc→Stellar
+minting is disabled until signer authorization entries exist. No mainnet
+capital product should be considered safe before the gates in
+[ROADMAP.md](docs/ROADMAP.md) and `AUDIT-PROGRAM.md` are met. See
+[PROJECT-STATUS.md](docs/PROJECT-STATUS.md) for the full inventory.
 
 ## Contributing
 

@@ -1,6 +1,6 @@
 # Suban Security
 
-Status: canonical security model (Phase 2, October 2026).
+Status: canonical security model (Phase 2-4, October 2026). For the current build and deployment inventory, see [PROJECT-STATUS.md](./PROJECT-STATUS.md).
 
 Suban handles market data, chain access and value-movement code. This document
 states the threat model, the controls that exist, and the gaps that are still

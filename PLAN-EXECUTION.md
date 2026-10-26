@@ -24,6 +24,8 @@ In plain terms:
 
 **Recommendation:** do **not** start Q2–Q4 2027 execution/capital work yet. Run a 90-day "Consolidate" phase first: correctness, security, data persistence, observability, CI, and documentation. The platform's credibility depends on the controller and data layer being trustworthy, not on shipping more contracts.
 
+**Current build inventory:** see [`docs/PROJECT-STATUS.md`](docs/PROJECT-STATUS.md) for every contract, crate, service, SDK, frontend, CI job, deployment ID and verified limit.
+
 **Update (23 October 2026):** Phase 0-2 are complete. Phase 3's technical/testnet scope is complete: the enriched CPMM, stableswap, oracle-aware lending, oracle and strategy-vault contracts are deployed to Pi testnet and reindexed; enriched pool state, LP positions, lending snapshots and indexed risk reads are live; and the internal **test-user consumer** passed 5/5 live checks. External production adoption and measured third-party usage are still absent, so the production-consumer exit criterion is not claimed. Phase 4 has testnet prototypes for 4.1–4.6 under an explicit owner-requested gate override: deployed `get_quote` parity matches the enriched pool, CPMM route discovery and read-only simulation work, the vault and oracle-aware liquidation were exercised, and a liquidation bot executed one testnet liquidation. The 4.7 audit-preparation package exists, but no auditor is engaged. No mainnet capital, vault allocation or production keeper is authorized.
 
 ---
