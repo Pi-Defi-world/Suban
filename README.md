@@ -10,6 +10,11 @@ integrate. For the current build inventory, deployment IDs and honest
 production/testnet classification, see
 [PROJECT-STATUS.md](docs/PROJECT-STATUS.md).
 
+For the verified Docker topology and a portable setup guide, see
+[LOCAL-SYSTEM.md](docs/LOCAL-SYSTEM.md). It distinguishes the official Pi-node
+Horizon APIs from the Suban Go RPC services and states which endpoints are
+currently healthy.
+
 ## Repositories
 
 | Repository | What it is |
@@ -27,8 +32,8 @@ production/testnet classification, see
 | Data API | `4000` | Horizon-compatible reads |
 | Event indexer / data platform | `3002` | Indexed ledgers, transactions, operations, accounts and contract events; public keys/quotas and webhooks. Financial projections include pool reserves, token direction, derived LP positions and lending position snapshots; USD valuation is opt-in and refuses stale prices |
 | Bridge relayer | `9464` | Metrics/health only; no public API |
-| RPC | `8000` / `8001` | Public JSON-RPC / private admin |
-| Horizon | `31401` / `41401` | Testnet / mainnet local Horizon |
+| RPC | `8000` / `8001` | Public JSON-RPC / private admin; see [LOCAL-SYSTEM.md](docs/LOCAL-SYSTEM.md) for current health |
+| Horizon | `42401` / `41401` | Suban testnet / mainnet local Horizon. `31401` is the separate Pi Network desktop-app testnet node. |
 
 ## Quick start (contracts and SDK)
 
@@ -56,6 +61,7 @@ Service quick starts live in each service directory:
 | Document | Purpose |
 |---|---|
 | [PROJECT-STATUS.md](docs/PROJECT-STATUS.md) | Current project status, all builds, deployment IDs and verified limits |
+| [LOCAL-SYSTEM.md](docs/LOCAL-SYSTEM.md) | Verified local Docker topology, endpoint health and portable setup |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Repositories, service boundaries, data flows, trust boundaries |
 | [DATA-PLATFORM.md](docs/DATA-PLATFORM.md) | Indexed schema, historical API, freshness, replay, keys and webhooks |
 | [PRODUCTS.md](docs/PRODUCTS.md) | Capability catalog with status and limits |
@@ -91,7 +97,10 @@ engaged**. The bridge supports Stellar→Arc on testnet, while Arc→Stellar
 minting is disabled until signer authorization entries exist. No mainnet
 capital product should be considered safe before the gates in
 [ROADMAP.md](docs/ROADMAP.md) and `AUDIT-PROGRAM.md` are met. See
-[PROJECT-STATUS.md](docs/PROJECT-STATUS.md) for the full inventory.
+[PROJECT-STATUS.md](docs/PROJECT-STATUS.md) for the full inventory. The current
+local runtime is documented in [LOCAL-SYSTEM.md](docs/LOCAL-SYSTEM.md); the
+official Pi Horizon APIs and testnet Stellar RPC are working, while the Suban Go
+RPC containers are not.
 
 ## Contributing
 

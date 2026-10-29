@@ -1,6 +1,6 @@
 # Suban - Project Status and Build Inventory
 
-Status: **current as of 26 October 2026**. Testnet-first. This document is the
+Status: **current as of 29 October 2026**. Testnet-first. This document is the
 single-page answer to "what is Suban, what is built, and what actually works?".
 It does not replace the execution plan, the audit package, or the per-service
 runbooks.
@@ -55,10 +55,10 @@ the security gates are met.
   upgrade and a documented `RUSTSEC-2026-0387` exception). The controller run
   `39820587698` on `d0db18d` is green. `Suban-api` and `suban-rpc` latest runs
   are green, with the RPC preflight caveat noted below.
-- **Local runtime at the last check:** the event indexer container
-  `suban-indexer-phase3` was running on port `3102`; the controller was not
-  listening on port `3101`. This is a local verification environment, not a
-  production deployment.
+- **Local runtime:** see [Local Docker runtime](#local-docker-runtime) below.
+  The official Pi mainnet/testnet Horizon APIs and the testnet Stellar RPC are
+  working; the Suban Go RPC containers are not. The enriched local indexer is
+  stale and the public data platform is not provisioned.
 
 ### Honest classification
 
@@ -68,6 +68,25 @@ the security gates are met.
 | **Testnet / experimental** | Deployed and exercised on Pi or Arc testnet, with documented limits. |
 | **Implemented, deployment owner-managed** | Code and tests exist; a live address may be old, unverified or absent. |
 | **Planned** | Design only; do not depend on it. |
+
+### Local Docker runtime
+
+Verified by read-only inspection on 29 October 2026. Full container inventory,
+public routing and portable setup are in [LOCAL-SYSTEM.md](./LOCAL-SYSTEM.md).
+
+| Surface | Local source | Status |
+|---|---|---|
+| Pi mainnet Horizon | official `pi-mainnet` node, `:41401` | Working; core/Horizon `v28.0.1`, network `Pi Network` |
+| Pi testnet Horizon | official `pi-testnet` node, `:42401` | Working; core/Horizon `v28.0.1`, network `Pi Testnet` |
+| Testnet Soroban RPC | `stellar-rpc-testnet`, public `testrpc.suban.org` | Working; `getHealth` healthy |
+| Official Pi-node RPC | `pi-mainnet`/`pi-testnet` supervisor `rpc` on `41403`/`42403` | Not working; `rpc STOPPED` on both |
+| Mainnet Suban JSON-RPC | `suban-rpc`, public `rpc.suban.org` | Not working; stale ledger (~304 hours) |
+| Testnet Suban JSON-RPC | `suban-rpc-testnet` | Not working; crash-looping, empty DB |
+| Price controller | `suban-controller`, public `oracle.suban.org` | Healthy; 4/4 sources active |
+| Enriched indexer | `suban-indexer-phase3`, local `:3102` | Running but stale; `data.suban.org` not provisioned |
+
+`testnet2` on `:31401` is the separate Pi Network desktop-app testnet node, not
+the Suban Compose `pi-testnet` node on `:42401`.
 
 ## 3. How the pieces fit
 
@@ -377,8 +396,13 @@ Verified on 23 October 2026 unless noted:
 - Named maintainers remain `TBD`.
 - `suban-rpc` preflight simulation tests are gated by a host/protocol mismatch
   (`soroban-env-host 23` vs protocol 25).
-- The current local controller was not running at the last runtime check; only
-  the indexer container was confirmed up.
+- The mainnet Suban Go RPC is stale and the testnet Suban Go RPC is
+  crash-looping. Use `horizon.suban.org` / `testnet.suban.org` for Horizon and
+  `testrpc.suban.org` for testnet Soroban RPC until the RPC image is rebuilt
+  against a protocol-28-compatible stellar-core.
+- The official Pi-node `rpc` supervisor service is stopped on `pi-mainnet` and
+  `pi-testnet`; their `41403`/`42403` ports are not working RPC endpoints.
+- The local enriched indexer is stale and `data.suban.org` is not provisioned.
 
 ## 8. Build and test commands
 

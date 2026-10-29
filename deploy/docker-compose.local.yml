@@ -1,0 +1,38 @@
+# Optional local-only override.
+#
+# Usage:
+#   docker compose -f docker-compose.suban.yml -f docker-compose.local.yml \
+#     up -d suban-api suban-controller stellar-rpc-testnet
+#
+# This publishes service ports on the host without Cloudflare. Do not use this
+# override when exposing the stack publicly through the cloudflared service.
+services:
+  suban-api:
+    ports:
+      - "4000:4000"
+
+  suban-controller:
+    ports:
+      - "3000:3000"
+
+  event-indexer:
+    ports:
+      - "3002:3002"
+
+  suban-rpc:
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+
+  suban-rpc-testnet:
+    ports:
+      - "8100:8000"
+      - "8101:8001"
+
+  stellar-rpc-testnet:
+    ports:
+      - "8200:8000"
+
+  caddy:
+    ports:
+      - "8080:80"

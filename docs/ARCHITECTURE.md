@@ -196,20 +196,29 @@ changes bump the response `schema_version`.
 
 ## 5. Deployment topology
 
+For the verified local container state and portable setup, see
+[LOCAL-SYSTEM.md](./LOCAL-SYSTEM.md). The table below describes the intended
+public surfaces; it is not a claim that every surface is healthy at every
+revision.
+
 Known/target hostnames (owner-managed, not all verified at every revision):
 
 | Surface | Target | Notes |
 |---|---|---|
 | Oracle/controller | `oracle.suban.org` | Public read routes; control routes private |
-| Horizon/data API | `horizon.suban.org` | `Suban-api` + Pi Horizon |
-| Testnet UI | `testnet.suban.org` | Testnet-facing frontend |
-| RPC | `rpc.suban.org` | Public JSON-RPC |
-| Test RPC | `testrpc.suban.org` | Testnet JSON-RPC |
+| Horizon/data API | `horizon.suban.org` | `Suban-api` + Pi mainnet Horizon |
+| Testnet Horizon API | `testnet.suban.org` | `pi-testnet` Horizon, not a frontend |
+| RPC | `rpc.suban.org` | Public JSON-RPC; see LOCAL-SYSTEM.md for current health |
+| Test RPC | `testrpc.suban.org` | Testnet Soroban JSON-RPC (`stellar-rpc-testnet`) |
 | Data platform | `data.suban.org` (target; not yet provisioned) | Indexed historical API; `/metrics` private |
-| Bridge relayer | internal worker | Metrics-only listener `:9464` |
+| Bridge relayer | internal worker | Metrics-only listener configured at `:9464` |
 
 Default ports: controller `3000`, Suban-api `4000`, event indexer `3002`, bridge
-relayer metrics `9464`, RPC `8000`/`8001`, Horizon `31401`/`41401`.
+relayer metrics `9464`, RPC `8000`/`8001`, Horizon `42401`/`41401`. The Pi
+Network desktop app also runs a separate `testnet2` node on `31401`-`31403`; it
+is not the Suban Compose testnet node. The official Pi-node supervisor `rpc`
+service on `41403`/`42403` is currently STOPPED; testnet Soroban RPC is served by
+`stellar-rpc-testnet`.
 
 Public read traffic and privileged control traffic must be separated by network
 policy. Oracle signing keys, relayer keys and the controller admin key are never

@@ -2,6 +2,11 @@
 # Uses Pi Node Docker image which includes stellar-core + Horizon + PostgreSQL + RPC
 # Usage: docker compose -f docker-compose.pi-dual.yml up -d
 #
+# DEPRECATED: this file still uses the p27.1.0 image and the older testnet2
+# port layout. For the current protocol-28 stack, use the separate
+# docker-compose.pi-mainnet-node.yml and docker-compose.pi-testnet-node.yml
+# files. The current testnet node is pi-testnet on 42401-42403.
+#
 # IMPORTANT: After containers start, core syncs first. Once synced, run:
 #   docker exec pi-mainnet supervisorctl start horizon rpc
 #   docker exec pi-testnet supervisorctl start horizon rpc

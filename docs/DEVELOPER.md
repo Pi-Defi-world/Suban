@@ -2,7 +2,8 @@
 
 ## Overview
 
-Suban is a DeFi protocol hub built on Stellar/Soroban (Protocol 27), providing:
+Suban is a DeFi protocol hub built on Stellar/Soroban (Protocol 27 contracts on
+the current Pi protocol-28 network), providing:
 - **AMM Core** — Constant-product and stableswap pools with factory deployment
 - **Lending Core** — Isolated lending pools with health factors and liquidation
 - **Oracle** — Decentralized price feeds with staleness checks and circuit breakers
@@ -445,6 +446,23 @@ indexed", not "not on chain". See [DATA-PLATFORM.md](./DATA-PLATFORM.md).
 ---
 
 ## Network Configuration
+
+### Local Docker endpoints
+
+The verified local stack and portable setup are documented in
+[LOCAL-SYSTEM.md](./LOCAL-SYSTEM.md). The main ports are:
+
+- Pi mainnet Horizon: `http://localhost:41401` (official `pi-mainnet` node)
+- Pi testnet Horizon: `http://localhost:42401` (Suban `pi-testnet` node)
+- Pi testnet Soroban RPC: `http://localhost:8200` with the local Compose
+  override, or `https://testrpc.suban.org`
+- Mainnet Suban JSON-RPC: `http://localhost:8000`; currently stale, see
+  LOCAL-SYSTEM.md
+- Official Pi-node RPC: `http://localhost:41403` and `http://localhost:42403`;
+  the supervisor `rpc` service is currently STOPPED
+- Price controller: `http://localhost:3000`
+
+`31401`-`31403` belong to the separate Pi Network desktop-app `testnet2` node.
 
 ### Pi Testnet
 - RPC: `https://rpc.testnet.minepi.com`
